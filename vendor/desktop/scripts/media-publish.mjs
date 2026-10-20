@@ -33,7 +33,7 @@ const option = (name) => {
 const flag = (name) => args.includes(name);
 
 const source = resolve(
-  option('--from') ?? fileURLToPath(new URL('../../../../Slidr-media/', import.meta.url)),
+  option('--from') ?? fileURLToPath(new URL('../../../Slidr-media/', import.meta.url)),
 );
 const target = resolve(option('--out') ?? join(tmpdir(), 'slidr-media-site'));
 const branch = option('--branch') ?? 'main';

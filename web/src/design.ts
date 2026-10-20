@@ -6,7 +6,7 @@
  * - converted by the app's own engine (`@slidr/html-import`), as the agent's slides are;
  * - made independent of any deck: text styles linked to the theme are written out on the runs,
  *   so every run names its font (`designs.test.ts`), and a design keeps its look in any deck;
- * - checked against the contract `apps/desktop/src/elements/designs.test.ts` holds every design
+ * - checked against the contract `desktop/src/elements/designs.test.ts` holds every design
  *   to, and by the app's design check (`@slidr/lint`, the rules the agent is held to);
  * - given the point on its picture's subject that the gallery's tests and the editor rely on.
  */

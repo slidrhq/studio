@@ -2,7 +2,7 @@
 
 - the design guidelines and the HTML conventions the app gives its own design agent
   (`packages/prompts`), and the names and taglines of its built-in templates in Hebrew and
-  English (`apps/desktop/src/templates/messages.ts`), both through
+  English (`desktop/src/templates/messages.ts`), both through
   `web/tools/instructions.mjs`;
 - the repository's design quality instruction (`AGENTS.md`);
 - the fonts of decks the media library offers (`fonts/catalog.json`).
@@ -38,7 +38,7 @@ SYSTEM_FONTS = {"ja": "Yu Gothic", "ko": "Malgun Gothic", "zh-CN": "Microsoft Ya
 SOURCES = [
     VENDOR / "packages" / "prompts" / "src" / "design.ts",
     VENDOR / "packages" / "prompts" / "src" / "html.ts",
-    VENDOR / "apps" / "desktop" / "src" / "templates" / "messages.ts",
+    VENDOR / "desktop" / "src" / "templates" / "messages.ts",
     VENDOR / "AGENTS.md",
 ]
 

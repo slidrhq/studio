@@ -11,7 +11,7 @@
  * - in the app, through the core's `media` protocol, which keeps the library on the machine and
  *   answers from there without the network (`src-tauri/src/media_library.rs`);
  * - in a plain browser (the dev server, the browser tests), through the dev server's stand-in for
- *   that protocol, at the path the server names (`apps/desktop/build/media.ts`);
+ *   that protocol, at the path the server names (`desktop/build/media.ts`);
  * - anywhere else (Node: the unit tests, scripts), from the site itself.
  *
  * Any read may come to nothing: the network is gone, the library was never published, it is

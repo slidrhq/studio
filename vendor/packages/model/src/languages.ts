@@ -6,8 +6,8 @@ import type { Direction } from './schema';
  * Every piece is written in the two base languages, Hebrew and English; a piece may also be
  * written in any of the others. A deck gets a piece in its own language when the piece has it,
  * and otherwise the English one, as it was written: left to right, not mirrored for a
- * right-to-left deck. They are the languages of the interface (`apps/desktop/src/i18n`), which
- * `apps/desktop/src/templates/contentLanguages.test.ts` holds them to.
+ * right-to-left deck. They are the languages of the interface (`desktop/src/i18n`), which
+ * `desktop/src/templates/contentLanguages.test.ts` holds them to.
  */
 export const CONTENT_LANGUAGES = [
   'he',

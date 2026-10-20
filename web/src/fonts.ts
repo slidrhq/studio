@@ -1,6 +1,6 @@
 /**
  * The fonts of decks, from the media library (`fonts/catalog.json`), registered with the page as
- * the app registers them (`apps/desktop/src/fonts/index.ts`): `@font-face` rules in a stylesheet,
+ * the app registers them (`desktop/src/fonts/index.ts`): `@font-face` rules in a stylesheet,
  * with the Hebrew subsets again as Hebrew-only faces, which the renderer puts first in a font
  * pair. Rules, not `FontFace` objects: the conversion engine renders the source HTML in a sandbox
  * frame and hands it the page's `@font-face` rules. A face is fetched only when text uses it, or

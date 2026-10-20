@@ -7,7 +7,7 @@ import { animatesLink } from './sanitize';
  * fragment, `#id`) or carries its picture with it (a raster image as `data:`).
  *
  * The same rules hold wherever such markup comes from. An SVG file is cleaned by them when it is
- * imported (`apps/desktop/src/objects/svgImport.ts`), and every `svg` element is cleaned by them
+ * imported (`desktop/src/objects/svgImport.ts`), and every `svg` element is cleaned by them
  * again when it is drawn (`prepareSvg`): the markup of an element is also written by the agent,
  * and arrives as it is in a deck somebody else made. Since an exported file is written from
  * what was drawn, a file never holds an address a picture brought with it.

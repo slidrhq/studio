@@ -8,7 +8,7 @@ The studio makes and publishes. To see what the library holds, as every installe
 
 The studio works with the app's own code: the packages it converts, renders and checks with, the app's instructions to its design agent and its quality bar (`AGENTS.md`), and the app's script that publishes the library. They are copied into `vendor/` from the app's repository, so this repository stands on its own; [vendor/README.md](vendor/README.md) says what is there and how to take a newer version. The media library's author copy sits beside the repository (`../Slidr-media`, `SLIDR_MEDIA_DIR`).
 
-Paths in this README such as `packages/…`, `apps/desktop/…`, `AGENTS.md` and `docs/…` are of the app's repository, copied in `vendor/` where the studio uses them.
+Paths in this README such as `packages/…`, `desktop/…`, `AGENTS.md` and `docs/…` are of the app's repository, copied in `vendor/` where the studio uses them.
 
 ```powershell
 ./start.ps1            # http://127.0.0.1:8765, opened in the browser
@@ -39,7 +39,7 @@ A design request also names its languages. Hebrew and English are always made, a
 4. **Render.** A headless Edge opens `render.html`. That page converts every file with `@slidr/html-import`, the engine the app's agent uses, and its fidelity guard gets real pictures of the page, as in the app. It then:
    - writes the theme's text styles out onto the runs, so the design keeps its type and colours in any deck;
    - runs the app's design check (`@slidr/lint`, the agent's rules);
-   - checks the contract that `apps/desktop/src/elements/designs.test.ts` holds every design to;
+   - checks the contract that `desktop/src/elements/designs.test.ts` holds every design to;
    - finds the point on the picture's subject, on top in every language;
    - takes the full-size slide and the gallery's 384 px thumbnail, in every language.
 5. **Review.** Claude reads the renders (two for each language) together with the findings and fixes the design. The number of rounds is set per request (default 2). A round in which Claude changes nothing ends the review. A design that still breaks the gallery's contract after the rounds gets one more turn to fix it, even when no rounds were asked for. Claude can also ask for a new picture, or a change to this one, through the concept's `brief.json`.
@@ -61,7 +61,7 @@ A template request names a built-in template and the languages to write its samp
 3. **Render.** The render page builds every slide on the template with `sampleSlides`, the engine the catalog and the app build a sample with, and draws them in one deck: each at 1920×1080 (`s01-full.png`…), each 384 px wide (`s01-thumb.png`…), and all of them on one sheet that reads in the language's direction (`sheet.png`). It runs the app's design check, every rule, as the acceptance of a template does, and builds the slide it was written from (English, or Hebrew for a right-to-left language) with the same seed: a finding that slide has on the same elements is not this language's doing, and is shown apart. It holds the sample to the English one: the same slides on the same layouts, as many fills under each role, the same pictures, text in the language's own letters, no English left (more than a quarter of the longer texts still in English is a contract issue) and no placeholder words.
 4. **Review, you, publishing.** As for a design: review rounds, then the variant up close (each slide full size, the sheet, the findings slide by slide), a change in words, approval. A sample that breaks its contract cannot be approved. Publishing writes `samples[<template>][<lang>]` into the author copy's `templates/catalog.json`, in the registry's order of languages, and changes nothing else of the file (it is written as `export-templates.mjs` writes it). Any other difference between that catalog and the published one (an author's work that is not published yet, such as another template's new languages) goes with the file, so the panel lists it part by part among the unexpected changes. It refuses a catalog that would pass the 25 MB Pages serves; every template in all sixteen languages would.
 
-`apps/desktop/scripts/export-templates.mjs` keeps a language the source file of a template does not write, so a template exported again keeps the translations the studio published.
+`desktop/scripts/export-templates.mjs` keeps a language the source file of a template does not write, so a template exported again keeps the translations the studio published.
 
 ## Publishing
 

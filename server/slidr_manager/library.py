@@ -10,7 +10,7 @@ The samples of templates the studio writes go into the catalog of templates,
 may hold an author's work that is not published yet, is the base, and nothing else of it changes
 (`templates.py`).
 
-Publishing goes through the repository's own `apps/desktop/scripts/media-publish.mjs`, from the
+Publishing goes through the repository's own `desktop/scripts/media-publish.mjs`, from the
 author copy (`../Slidr-media`), so it keeps that script's staging, manifest and guards:
 
 1. prepare: copy into the author copy the published files it lacks (never one it has), write the
@@ -57,7 +57,7 @@ MANAGED = "elements/designs/managed.json"
 INDEX = "elements/designs/index.json"
 #: The largest file Cloudflare Pages serves (docs/media-library.md).
 FILE_LIMIT = 25 * 1024 * 1024
-PUBLISH_SCRIPT = VENDOR / "apps" / "desktop" / "scripts" / "media-publish.mjs"
+PUBLISH_SCRIPT = VENDOR / "desktop" / "scripts" / "media-publish.mjs"
 LOG_LIMIT = 600
 
 

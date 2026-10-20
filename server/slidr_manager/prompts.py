@@ -3,7 +3,7 @@
 The system prompt is assembled from the app's own instructions (`instructions.py`): the quality
 bar of AGENTS.md, the design guidelines and HTML conventions of `packages/prompts`, and the
 fonts of the library. What is said here is only what a design of the gallery adds to them: the
-contract the app's catalog and its tests hold a design to (`apps/desktop/src/elements/
+contract the app's catalog and its tests hold a design to (`desktop/src/elements/
 designs.test.ts`), and how the studio's files and turns work.
 
 Every prompt names the languages of its request (`languages.py`): one HTML file per language,

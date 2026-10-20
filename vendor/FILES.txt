@@ -1,9 +1,9 @@
 # The app's files this repository uses (scripts/vendor.mjs), by their path in the app's repository.
 AGENTS.md
-apps/desktop/build/media.ts
-apps/desktop/build/mediaChunks.ts
-apps/desktop/scripts/media-publish.mjs
-apps/desktop/src/templates/messages.ts
+desktop/build/media.ts
+desktop/build/mediaChunks.ts
+desktop/scripts/media-publish.mjs
+desktop/src/templates/messages.ts
 packages/agent-tools/src/background.ts
 packages/agent-tools/src/errors.ts
 packages/agent-tools/src/images.ts

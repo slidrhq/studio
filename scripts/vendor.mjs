@@ -27,7 +27,7 @@ const files = [
   ...packages.flatMap((dir) => [`${dir}/package.json`, `${dir}/tsconfig.json`]),
 ];
 
-for (const entry of ['packages', 'apps', 'tsconfig.base.json', 'AGENTS.md']) {
+for (const entry of ['packages', 'desktop', 'tsconfig.base.json', 'AGENTS.md']) {
   rmSync(join(vendor, entry), { recursive: true, force: true });
 }
 for (const path of files) {
