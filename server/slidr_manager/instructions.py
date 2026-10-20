@@ -16,7 +16,7 @@ import urllib.request
 from collections.abc import Sequence
 from pathlib import Path
 
-from .config import APP_REPO, WEB, Settings
+from .config import VENDOR, WEB, Settings
 from .languages import NAMES, SCRIPT, files, listing, names
 from .programs import creation_flags, find_node
 
@@ -36,10 +36,10 @@ SCRIPT_NAMES = {
 SYSTEM_FONTS = {"ja": "Yu Gothic", "ko": "Malgun Gothic", "zh-CN": "Microsoft YaHei", "hi": "Nirmala UI"}
 
 SOURCES = [
-    APP_REPO / "packages" / "prompts" / "src" / "design.ts",
-    APP_REPO / "packages" / "prompts" / "src" / "html.ts",
-    APP_REPO / "apps" / "desktop" / "src" / "templates" / "messages.ts",
-    APP_REPO / "AGENTS.md",
+    VENDOR / "packages" / "prompts" / "src" / "design.ts",
+    VENDOR / "packages" / "prompts" / "src" / "html.ts",
+    VENDOR / "apps" / "desktop" / "src" / "templates" / "messages.ts",
+    VENDOR / "AGENTS.md",
 ]
 
 
@@ -53,7 +53,7 @@ def _stamp() -> tuple[float, ...]:
 
 def quality_bar() -> str:
     """AGENTS.md without its title."""
-    text = (APP_REPO / "AGENTS.md").read_text(encoding="utf-8")
+    text = (VENDOR / "AGENTS.md").read_text(encoding="utf-8")
     lines = [line for line in text.splitlines() if not line.startswith("# ")]
     return "\n".join(lines).strip()
 

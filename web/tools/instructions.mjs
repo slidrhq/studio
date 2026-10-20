@@ -13,8 +13,8 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 
-// The app's repository, checked out beside this one.
-const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'app');
+// The app's code, copied at its paths in the app's repository (vendor/README.md).
+const repo = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'vendor');
 const prompts = join(repo, 'packages', 'prompts');
 
 const server = await createServer({

@@ -1,7 +1,7 @@
 {
-  // The app's compiler options (tsconfig.base.json of github.com/slidrhq/app): the app's modules
-  // these pages import are checked with the options they are written for.
-  "extends": "../../app/tsconfig.base.json",
+  // The app's compiler options: the app's modules these pages import (vendor/) are checked with
+  // the options they are written for.
+  "extends": "../vendor/tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",

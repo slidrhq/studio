@@ -2,8 +2,6 @@ import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
-/** The app's repository (github.com/slidrhq/app), checked out beside this one. */
-const app = fileURLToPath(new URL('../../app/', import.meta.url));
 /** The Python server: the API, the job files, and the built pages in production. */
 const api = process.env.SLIDR_MANAGER_API ?? 'http://127.0.0.1:8765';
 
@@ -12,12 +10,9 @@ const api = process.env.SLIDR_MANAGER_API ?? 'http://127.0.0.1:8765';
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
-  // The app's packages import React from the app's own install: one copy for the whole page.
-  resolve: { dedupe: ['react', 'react-dom'] },
   server: {
     port: 5175,
     strictPort: true,
-    fs: { allow: ['.', app] },
     proxy: { '/api': { target: api, changeOrigin: false } },
   },
   build: {

@@ -1,8 +1,8 @@
 """Where things are, and what can be changed through the environment.
 
-Every path has a default that works from a clone of this repository with the app's repository
-beside it (`../app`, github.com/slidrhq/app), whose packages, scripts and instructions the studio
-uses, and the media library's author copy (`../Slidr-media`, docs/media-library.md of the app).
+Every path has a default that works from a clone of this repository with the media library's
+author copy beside it (`../Slidr-media`, docs/media-library.md of the app). The app's packages,
+scripts and instructions the studio uses are copied in `vendor/` (vendor/README.md).
 """
 
 from __future__ import annotations
@@ -13,8 +13,8 @@ from pathlib import Path
 
 STUDIO = Path(__file__).resolve().parents[2]
 WEB = STUDIO / "web"
-#: The app's repository, checked out beside this one.
-APP_REPO = STUDIO.parent / "app"
+#: The app's code the studio uses, at its paths in the app's repository (vendor/README.md).
+VENDOR = STUDIO / "vendor"
 
 #: The Cloudflare account of the media library (docs/media-library.md). Not a secret.
 DEFAULT_ACCOUNT_ID = "d3a1982ae102ceb45926da85e92d6edf"

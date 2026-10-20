@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    // No JSX here; the renderer's sources, which this package imports, are TSX.
+    "jsx": "react-jsx"
+  },
+  "include": ["src"]
+}

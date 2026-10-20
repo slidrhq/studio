@@ -1,0 +1,18 @@
+{
+  "name": "@slidr/templates",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./fixtures": "./src/fixtures/index.ts",
+    "./builtin": "./src/builtin/index.ts",
+    "./builtin/kit": "./src/builtin/kit.ts",
+    "./builtin/pictures": "./src/builtin/pictures.generated.ts"
+  },
+  "dependencies": {
+    "@slidr/media-library": "workspace:*",
+    "@slidr/model": "workspace:*",
+    "zod": "^4.6.5"
+  }
+}

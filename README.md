@@ -6,23 +6,15 @@ The studio makes and publishes. To see what the library holds, as every installe
 
 ## Setup
 
-The studio uses the app's packages, scripts and instructions straight from the app's repository, so the app has to be checked out beside it, with its packages installed. The media library's author copy sits beside them too:
+The studio works with the app's own code: the packages it converts, renders and checks with, the app's instructions to its design agent and its quality bar (`AGENTS.md`), and the app's script that publishes the library. They are copied into `vendor/` from the app's repository, so this repository stands on its own; [vendor/README.md](vendor/README.md) says what is there and how to take a newer version. The media library's author copy sits beside the repository (`../Slidr-media`, `SLIDR_MEDIA_DIR`).
 
-```text
-slidr/
-  app/            github.com/slidrhq/app (pnpm install)
-  studio/         this repository
-  library/        github.com/slidrhq/library (optional: browsing the published library)
-  Slidr-media/    the media library's author copy (SLIDR_MEDIA_DIR)
-```
-
-Paths in this README such as `packages/…`, `apps/desktop/…`, `AGENTS.md` and `docs/…` are of the app's repository.
+Paths in this README such as `packages/…`, `apps/desktop/…`, `AGENTS.md` and `docs/…` are of the app's repository, copied in `vendor/` where the studio uses them.
 
 ```powershell
 ./start.ps1            # http://127.0.0.1:8765, opened in the browser
 ```
 
-On the first run, the launcher creates `server/.venv` and installs `server/requirements.txt`. It installs the pages' packages (`pnpm install`; the app's packages are linked from `../app`) and rebuilds the pages whenever a source file is newer than the build. It needs Python 3.11 or newer, Node, pnpm and the installed Microsoft Edge (the headless renders run in it). It also needs both CLIs, signed in:
+On the first run, the launcher creates `server/.venv` and installs `server/requirements.txt`. It installs the pages' packages (`pnpm install`) and rebuilds the pages whenever a source file is newer than the build. It needs Python 3.11 or newer, Node, pnpm and the installed Microsoft Edge (the headless renders run in it). It also needs both CLIs, signed in:
 
 - **Claude Code** (`claude`), on your Claude login. It plans the concepts and writes, reviews and fixes the designs.
 - **Codex CLI** (`codex login`), on your ChatGPT login. It makes the pictures. The studio finds `codex` on the PATH, behind npm's shim, or inside VS Code's ChatGPT extension. `CODEX_PATH` names it outright.
@@ -58,7 +50,7 @@ A design request also names its languages. Hebrew and English are always made, a
 
    A design that breaks the gallery's contract cannot be approved. A design with errors from the design check can be, after a confirmation.
 
-What Claude is told comes from the app itself, never from a copy: the design guidelines and HTML conventions of `packages/prompts` (read through `web/tools/instructions.mjs`), the quality bar of `AGENTS.md`, and the fonts the library offers: the families of each of the request's languages (made for its letters, or for Latin ones and having its letters), and the counterpart in each language of every family the English and Hebrew files may use, the family of its letters closest to it in character, which that language's file sets the same text in (the catalog's `counterparts`, ADR-105). `server/slidr_manager/prompts.py` adds only what a gallery design needs on top: the contract and the studio's workflow, for the request's languages. Where no family of the library has a language's letters (only in a catalog older than ADR-105), its text names one family of the library for its Latin letters and figures, then `sans-serif` (`font-family: 'Inter', sans-serif`), and the system's font draws the rest, the same when the HTML is converted as when the app draws the slide. The server's copy of the language list, `server/slidr_manager/languages.py`, is held to the model's by the unit tests.
+What Claude is told comes from the app's own text (copied in `vendor/`), never written again here: the design guidelines and HTML conventions of `packages/prompts` (read through `web/tools/instructions.mjs`), the quality bar of `AGENTS.md`, and the fonts the library offers: the families of each of the request's languages (made for its letters, or for Latin ones and having its letters), and the counterpart in each language of every family the English and Hebrew files may use, the family of its letters closest to it in character, which that language's file sets the same text in (the catalog's `counterparts`, ADR-105). `server/slidr_manager/prompts.py` adds only what a gallery design needs on top: the contract and the studio's workflow, for the request's languages. Where no family of the library has a language's letters (only in a catalog older than ADR-105), its text names one family of the library for its Latin letters and figures, then `sans-serif` (`font-family: 'Inter', sans-serif`), and the system's font draws the rest, the same when the HTML is converted as when the app draws the slide. The server's copy of the language list, `server/slidr_manager/languages.py`, is held to the model's by the unit tests.
 
 ## Template samples
 
@@ -116,4 +108,4 @@ cd server; .venv/Scripts/python -m slidr_manager --no-open
 node web/tools/snap.mjs --url "http://127.0.0.1:8765/render.html?v=<vid>" --out <dir> --debug
 ```
 
-`pnpm check` runs `typecheck`, `eslint` and `prettier` over the pages. The unit tests hold the server's copy of the language list to the app's (`../app/packages/model`).
+`pnpm check` runs `typecheck`, `eslint` and `prettier` over the pages. The unit tests hold the server's copy of the language list to the app's (`vendor/packages/model`).

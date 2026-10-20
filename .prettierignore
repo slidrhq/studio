@@ -5,3 +5,6 @@ dist/
 server/.venv/
 server/.pytest_cache/
 .data*/
+
+# The app's code, copied as it is (vendor/README.md).
+vendor/

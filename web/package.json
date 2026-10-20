@@ -9,13 +9,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@slidr/agent-tools": "link:../../app/packages/agent-tools",
-    "@slidr/html-import": "link:../../app/packages/html-import",
-    "@slidr/lint": "link:../../app/packages/lint",
-    "@slidr/media-library": "link:../../app/packages/media-library",
-    "@slidr/model": "link:../../app/packages/model",
-    "@slidr/renderer": "link:../../app/packages/renderer",
-    "@slidr/templates": "link:../../app/packages/templates",
+    "@slidr/agent-tools": "workspace:*",
+    "@slidr/html-import": "workspace:*",
+    "@slidr/lint": "workspace:*",
+    "@slidr/media-library": "workspace:*",
+    "@slidr/model": "workspace:*",
+    "@slidr/renderer": "workspace:*",
+    "@slidr/templates": "workspace:*",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },

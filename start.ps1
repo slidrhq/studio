@@ -5,8 +5,7 @@
 #   ./start.ps1 -NoOpen
 #
 # The first run makes the Python environment (server/.venv) and installs the server's packages.
-# The pages are built again whenever a source file is newer than the build. The app's repository
-# must be checked out beside this one (../app), with its packages installed.
+# The pages are built again whenever a source file is newer than the build.
 param(
   [int]$Port = 8765,
   [switch]$NoOpen
@@ -15,10 +14,6 @@ $ErrorActionPreference = 'Stop'
 
 $here = $PSScriptRoot
 $repo = $here
-$app = Join-Path (Split-Path $here -Parent) 'app'
-if (-not (Test-Path (Join-Path $app 'node_modules'))) {
-  throw "The app's repository, installed, is needed beside this one: clone github.com/slidrhq/app into $app and run pnpm install there."
-}
 $server = Join-Path $here 'server'
 $python = Join-Path $server '.venv\Scripts\python.exe'
 

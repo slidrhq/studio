@@ -1,0 +1,11 @@
+{
+  "name": "@slidr/runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./names": "./src/names.ts",
+    "./bundle": "./src/bundle.generated.ts"
+  }
+}

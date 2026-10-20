@@ -15,7 +15,7 @@ from pydantic import ValidationError
 
 from slidr_manager import claude_cli, codex_cli, languages, prompts, template_prompts, templates
 from slidr_manager.app import NewRequest
-from slidr_manager.config import APP_REPO, Settings
+from slidr_manager.config import VENDOR, Settings
 from slidr_manager.events import EventBus
 from slidr_manager.instructions import Instructions
 from slidr_manager.library import Library, LibraryError, empty_catalog, merge_design, to_webp
@@ -344,7 +344,7 @@ def _ts_block(text: str, start: str) -> str:
 
 
 def test_the_language_list_is_the_models():
-    source = (APP_REPO / "packages" / "model" / "src" / "languages.ts").read_text(encoding="utf-8")
+    source = (VENDOR / "packages" / "model" / "src" / "languages.ts").read_text(encoding="utf-8")
     codes = re.findall(r"'([\w-]+)'", _ts_block(source, "export const CONTENT_LANGUAGES"))
     assert tuple(codes) == languages.CONTENT_LANGUAGES
     base = re.findall(r"'([\w-]+)'", _ts_block(source, "export const BASE_LANGUAGES"))
@@ -355,7 +355,7 @@ def test_the_language_list_is_the_models():
     scripts = dict(re.findall(r"'?([\w-]+)'?: '(\w+)'", _ts_block(source, "export const LANGUAGE_SCRIPT")))
     assert scripts == languages.SCRIPT
     # The right-to-left ones, as the model's `languageDir` says (`isRtlLanguage`).
-    factories = (APP_REPO / "packages" / "model" / "src" / "factories.ts").read_text(encoding="utf-8")
+    factories = (VENDOR / "packages" / "model" / "src" / "factories.ts").read_text(encoding="utf-8")
     rtl = set(re.findall(r"'(\w+)'", re.search(r"const RTL = new Set\(\[([^\]]*)\]\)", factories).group(1)))
     assert {code for code in codes if code.split("-")[0].lower() in rtl} == languages.RTL
     assert [languages.direction(code) for code in ("he", "ar", "en", "zh-CN")] == ["rtl", "rtl", "ltr", "ltr"]

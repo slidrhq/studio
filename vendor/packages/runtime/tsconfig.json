@@ -1,0 +1,9 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    // Only for the tests, which read the package's own files. The runtime itself is browser code.
+    "types": ["node"]
+  },
+  "include": ["src"]
+}

@@ -165,6 +165,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@slidr/media-library':
+        specifier: workspace:*
+        version: link:vendor/packages/media-library
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -188,29 +192,121 @@ importers:
         specifier: ^8.71.0
         version: 8.71.2(eslint@10.13.0)(typescript@6.0.3)
 
+  vendor/packages/agent-tools:
+    dependencies:
+      '@slidr/model':
+        specifier: workspace:*
+        version: link:../model
+      '@slidr/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.7
+
+  vendor/packages/html-import:
+    dependencies:
+      '@slidr/agent-tools':
+        specifier: workspace:*
+        version: link:../agent-tools
+      '@slidr/model':
+        specifier: workspace:*
+        version: link:../model
+      '@slidr/renderer':
+        specifier: workspace:*
+        version: link:../renderer
+      '@slidr/runtime':
+        specifier: workspace:*
+        version: link:../runtime
+
+  vendor/packages/lint:
+    dependencies:
+      '@slidr/model':
+        specifier: workspace:*
+        version: link:../model
+
+  vendor/packages/media-library: {}
+
+  vendor/packages/model:
+    dependencies:
+      immer:
+        specifier: ^11.1.18
+        version: 11.1.21
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.7
+      zustand:
+        specifier: ^5.0.15
+        version: 5.0.15(@types/react@19.3.0)(immer@11.1.21)(react@19.3.1)
+
+  vendor/packages/prompts:
+    dependencies:
+      '@slidr/agent-tools':
+        specifier: workspace:*
+        version: link:../agent-tools
+      '@slidr/model':
+        specifier: workspace:*
+        version: link:../model
+
+  vendor/packages/renderer:
+    dependencies:
+      '@slidr/model':
+        specifier: workspace:*
+        version: link:../model
+      echarts:
+        specifier: 6.1.0
+        version: 6.1.0
+    devDependencies:
+      '@types/react':
+        specifier: ^19.3.0
+        version: 19.3.0
+      '@types/react-dom':
+        specifier: ^19.3.0
+        version: 19.3.0(@types/react@19.3.0)
+      react:
+        specifier: ^19.3.0
+        version: 19.3.1
+      react-dom:
+        specifier: ^19.3.0
+        version: 19.3.1(react@19.3.1)
+
+  vendor/packages/runtime: {}
+
+  vendor/packages/templates:
+    dependencies:
+      '@slidr/media-library':
+        specifier: workspace:*
+        version: link:../media-library
+      '@slidr/model':
+        specifier: workspace:*
+        version: link:../model
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.7
+
   web:
     dependencies:
       '@slidr/agent-tools':
-        specifier: link:../../app/packages/agent-tools
-        version: link:../../app/packages/agent-tools
+        specifier: workspace:*
+        version: link:../vendor/packages/agent-tools
       '@slidr/html-import':
-        specifier: link:../../app/packages/html-import
-        version: link:../../app/packages/html-import
+        specifier: workspace:*
+        version: link:../vendor/packages/html-import
       '@slidr/lint':
-        specifier: link:../../app/packages/lint
-        version: link:../../app/packages/lint
+        specifier: workspace:*
+        version: link:../vendor/packages/lint
       '@slidr/media-library':
-        specifier: link:../../app/packages/media-library
-        version: link:../../app/packages/media-library
+        specifier: workspace:*
+        version: link:../vendor/packages/media-library
       '@slidr/model':
-        specifier: link:../../app/packages/model
-        version: link:../../app/packages/model
+        specifier: workspace:*
+        version: link:../vendor/packages/model
       '@slidr/renderer':
-        specifier: link:../../app/packages/renderer
-        version: link:../../app/packages/renderer
+        specifier: workspace:*
+        version: link:../vendor/packages/renderer
       '@slidr/templates':
-        specifier: link:../../app/packages/templates
-        version: link:../../app/packages/templates
+        specifier: workspace:*
+        version: link:../vendor/packages/templates
       react:
         specifier: ^19.3.0
         version: 19.3.1
@@ -659,6 +755,9 @@ packages:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
 
+  echarts@6.1.0:
+    resolution: {integrity: sha512-q0yaFPggC9FUdsWH4blavRWFmxdrIodbkoKNAjJudAI6CA9gNPxHtV2RcZNEepZVlk4yvBYkOkbk6HIVpIyHZA==}
+
   electron-to-chromium@1.5.459:
     resolution: {integrity: sha512-4SC9HHSFjO/liAhifpdOL5hG9b4BP7/5G3y3UPZVO8trlAXr1CaUEEJL0gWK3kOcYcZrOA5rkwG45Gra/lTIgg==}
 
@@ -789,6 +888,9 @@ packages:
   ignore@7.0.12:
     resolution: {integrity: sha512-/8UvqAPU9DGTI9k4mxtf49U37Isfwr8Uts96+SBHIkFxPJnHS0Ew4f00sM4Scd8V8EjM0jUNtVDdv1kPdt35lg==}
     engines: {node: '>= 4'}
+
+  immer@11.1.21:
+    resolution: {integrity: sha512-bZSadeCPGdaY5/qRLgr6mDSH1ra21rD3rqpiWk7+QTr4ayYPTE9qZYdLh/NdPhMe0wSrTvHD/Lk8q5EwhUs0aw==}
 
   imurmurhash@0.1.4:
     resolution: {integrity: sha512-JmXMZ6wuvDmLiHEml9ykzqO6lwFbof0GG4IkcGaENdCRDDmMVnny7s5HsIgHCbaq0w2MyPhDqkhTUgS2LU2PHA==}
@@ -1037,6 +1139,9 @@ packages:
     peerDependencies:
       typescript: '>=4.8.4'
 
+  tslib@2.3.0:
+    resolution: {integrity: sha512-N82ooyxVNm6h1riLCoyS9e3fuJ3AMG2zIZs2Gd1ATcSFjSA23Q0fzjjZeh0jbJvWVDZ0cJT8yaNNaaXHzueNjg==}
+
   type-check@0.4.0:
     resolution: {integrity: sha512-XleUoc9uwGXqjWwXaUTZAmzMcFZ5858QA2vvx1Ur5xIcixXIP+8LnFDgRplU30us6teqdlskFfu+ae4K79Ooew==}
     engines: {node: '>= 0.8.0'}
@@ -1132,6 +1237,27 @@ packages:
 
   zod@4.6.7:
     resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
+
+  zrender@6.1.0:
+    resolution: {integrity: sha512-oEGMDB6pOP2S6OwRR4PdVv610zrjnA3Bh+JnSG12fYJlBKjtNAoEb5fSUoCOOINlH96I2fU38/A2UpRKs67xYQ==}
+
+  zustand@5.0.15:
+    resolution: {integrity: sha512-MpSEjRiBkA9crSYeOUH32rJC7SVqAbm0Fqcqge/bUi2PPoLcBWKOsG+C8mevmpr8TwXHBVkChbbJiyvkE+i/3A==}
+    engines: {node: '>=12.20.0'}
+    peerDependencies:
+      '@types/react': '>=18.0.0'
+      immer: '>=9.0.6'
+      react: '>=18.0.0'
+      use-sync-external-store: '>=1.2.0'
+    peerDependenciesMeta:
+      '@types/react':
+        optional: true
+      immer:
+        optional: true
+      react:
+        optional: true
+      use-sync-external-store:
+        optional: true
 
 snapshots:
 
@@ -1544,6 +1670,11 @@ snapshots:
 
   detect-libc@2.1.2: {}
 
+  echarts@6.1.0:
+    dependencies:
+      tslib: 2.3.0
+      zrender: 6.1.0
+
   electron-to-chromium@1.5.459: {}
 
   escalade@3.2.0: {}
@@ -1680,6 +1811,8 @@ snapshots:
   ignore@5.3.2: {}
 
   ignore@7.0.12: {}
+
+  immer@11.1.21: {}
 
   imurmurhash@0.1.4: {}
 
@@ -1877,6 +2010,8 @@ snapshots:
     dependencies:
       typescript: 6.0.3
 
+  tslib@2.3.0: {}
+
   type-check@0.4.0:
     dependencies:
       prelude-ls: 1.2.1
@@ -1932,3 +2067,13 @@ snapshots:
       zod: 4.6.7
 
   zod@4.6.7: {}
+
+  zrender@6.1.0:
+    dependencies:
+      tslib: 2.3.0
+
+  zustand@5.0.15(@types/react@19.3.0)(immer@11.1.21)(react@19.3.1):
+    optionalDependencies:
+      '@types/react': 19.3.0
+      immer: 11.1.21
+      react: 19.3.1

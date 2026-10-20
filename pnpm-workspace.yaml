@@ -1,4 +1,5 @@
-# The studio's pages. The app's packages they use come from the app's repository, checked out
-# beside this one (../app), by `link:` (web/package.json).
+# The studio's pages, and the app's packages they use, copied from the app's repository
+# (vendor/README.md).
 packages:
   - web
+  - vendor/packages/*

@@ -1,0 +1,14 @@
+{
+  "name": "@slidr/agent-tools",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@slidr/model": "workspace:*",
+    "@slidr/runtime": "workspace:*",
+    "zod": "^4.6.5"
+  }
+}

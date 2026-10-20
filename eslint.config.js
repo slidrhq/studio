@@ -12,6 +12,8 @@ export default tseslint.config(
       // The server's Python environment, and the studio's local requests and renders.
       'server/.venv/**',
       '.data*/**',
+      // The app's code, copied as it is (vendor/README.md).
+      'vendor/**',
     ],
   },
 
@@ -40,7 +42,7 @@ export default tseslint.config(
   },
 
   {
-    files: ['*.config.{js,ts}', '**/*.config.{js,ts}'],
+    files: ['*.config.{js,ts}', '**/*.config.{js,ts}', 'scripts/**/*.mjs'],
     languageOptions: { globals: globals.node },
   },
 

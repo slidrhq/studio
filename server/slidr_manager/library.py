@@ -36,7 +36,7 @@ from typing import Any
 
 from PIL import Image
 
-from .config import APP_REPO, Settings
+from .config import VENDOR, Settings
 from .events import EventBus
 from .languages import BASE_LANGUAGES, CONTENT_LANGUAGES, NAMES
 from .programs import creation_flags, find_node
@@ -55,7 +55,7 @@ MANAGED = "elements/designs/managed.json"
 INDEX = "elements/designs/index.json"
 #: The largest file Cloudflare Pages serves (docs/media-library.md).
 FILE_LIMIT = 25 * 1024 * 1024
-PUBLISH_SCRIPT = APP_REPO / "apps" / "desktop" / "scripts" / "media-publish.mjs"
+PUBLISH_SCRIPT = VENDOR / "apps" / "desktop" / "scripts" / "media-publish.mjs"
 LOG_LIMIT = 600
 
 
@@ -431,7 +431,7 @@ class Library:
             env["CLOUDFLARE_ACCOUNT_ID"] = self.settings.cloudflare_account_id
         process = await asyncio.create_subprocess_exec(
             *args,
-            cwd=str(APP_REPO),
+            cwd=str(VENDOR),
             stdin=asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.STDOUT,
