@@ -13,7 +13,7 @@ import pytest
 from PIL import Image
 from pydantic import ValidationError
 
-from slidr_manager import claude_cli, codex_cli, languages, prompts, template_prompts, templates
+from slidr_manager import claude_cli, codex_cli, languages, prompts, template_prompts, templates, uploads
 from slidr_manager.app import NewRequest
 from slidr_manager.config import VENDOR, Settings
 from slidr_manager.events import EventBus
@@ -491,3 +491,69 @@ def test_a_design_is_published_with_a_slide_for_every_language(tmp_path: Path):
     write_json(work / "renders" / "r1" / "result.json", {"publishable": True, "langs": sides, "subject": [5, 6]})
     with pytest.raises(LibraryError):
         library._design_record(variant)
+
+
+# ---------------------------------------------------------------- uploads to the library
+
+
+def test_a_design_is_uploaded_with_its_slides_names_and_tags():
+    record = {
+        "id": "m-x",
+        "name": {"he": "שם", "en": "Name"},
+        "group": "g",
+        "groupName": {"he": "ק", "en": "G"},
+        "slides": {"he": {"id": "a"}, "en": {"id": "b"}, "ar": {"id": "c"}},
+        "subject": [5, 6],
+        "size": [64, 36],
+        "tags": {"he": ["הזמנה", "מסיבה", "אירוע"], "en": ["invitation", "party", "event"]},
+    }
+    upload = uploads.design_upload(record)
+    assert {key: upload[key] for key in ("type", "action", "id", "group", "subject")} == {
+        "type": "designs",
+        "action": "add",
+        "id": "m-x",
+        "group": "g",
+        "subject": [5, 6],
+    }
+    assert upload["languages"]["he"] == {
+        "slide": {"id": "a"},
+        "name": "שם",
+        "groupName": "ק",
+        "tags": ["הזמנה", "מסיבה", "אירוע"],
+    }
+    assert upload["languages"]["en"]["tags"] == ["invitation", "party", "event"]
+    # Another language carries its slide alone: names and tags are Hebrew and English.
+    assert upload["languages"]["ar"] == {"slide": {"id": "c"}}
+    assert "tags" not in uploads.design_upload({**record, "tags": None})["languages"]["he"]
+    sample = uploads.sample_upload("mifgash", "fr", [{"layout": "l"}])
+    assert sample == {"type": "templates", "action": "translate", "id": "mifgash", "languages": {"fr": {"sample": [{"layout": "l"}]}}}
+
+
+def test_an_upload_goes_as_a_form_of_its_json_and_its_files():
+    body, content_type = uploads.multipart({"id": "m-x", "name": "שם"}, {"picture": (b"RIFF0000WEBP", "image/webp")})
+    boundary = content_type.split("boundary=")[1]
+    assert content_type.startswith("multipart/form-data; boundary=")
+    text = body.decode("utf-8", errors="replace")
+    assert 'name="upload"' in text and '{"id": "m-x", "name": "שם"}' in text
+    assert 'name="picture"; filename="picture.webp"' in text and "Content-Type: image/webp" in text
+    assert text.rstrip().endswith(f"--{boundary}--")
+
+
+def test_the_library_says_why_it_did_not_take_an_upload(monkeypatch):
+    api = uploads.LibraryApi("https://library.example/", "a-key")
+    sent: list[tuple] = []
+
+    def answer(method, path, body=None, content_type=None):
+        sent.append((method, path, content_type))
+        return 422, {"error": "invalid", "message": "The upload does not hold.", "issues": [{"path": "languages.he.tags", "message": "The search tags…"}]}
+
+    monkeypatch.setattr(api, "_call", answer)
+    with pytest.raises(uploads.UploadError) as refused:
+        asyncio.run(api.send({"type": "designs"}))
+    assert str(refused.value) == "The upload does not hold."
+    assert refused.value.issues[0]["path"] == "languages.he.tags"
+    assert sent[0][:2] == ("POST", "/api/uploads") and sent[0][2].startswith("multipart/form-data")
+    monkeypatch.setattr(api, "_call", lambda *args, **kwargs: (201, {"id": "u-1", "status": "pending"}))
+    assert asyncio.run(api.send({"type": "designs"}))["id"] == "u-1"
+    with pytest.raises(uploads.UploadError, match="no key"):
+        uploads.LibraryApi("https://library.example/", None)._call("GET", "/api/uploads")

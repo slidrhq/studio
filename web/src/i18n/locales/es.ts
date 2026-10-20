@@ -53,32 +53,16 @@ const words: Record<MessageKey, string> = {
   'publish.close': 'Cerrar',
   'publish.itemsToPublish': '{count} elementos para publicar',
   'publish.noApproved': 'No hay elementos aprobados',
-  'publish.noteDesigns1': 'Los diseños van a su propio catálogo, ',
-  'publish.noteDesigns2': ', con ID que empiezan por ',
-  'publish.noteDesigns3':
-    ', junto a los diseños escritos a mano. Las muestras de plantillas van al catálogo de plantillas, ',
-  'publish.noteDesigns4':
-    ', cada idioma en su lugar, y nada más en el archivo cambia. La publicación se hace con el comando del repositorio ',
-  'publish.noteDesigns5': ', desde la copia en ',
-  'publish.tokenTitle': 'Token de Cloudflare',
-  'publish.tokenHelp':
-    'Un token de API con el permiso Cloudflare Pages: Edit. Se guarda solo en la memoria del servidor, nunca en disco.',
   'publish.save': 'Guardar',
-  'publish.reportSummary':
-    'En comparación con la biblioteca publicada ({before} archivos): se añadirán {added}, cambiarán {changed} y se eliminarán {removed}. Tras publicar tendrá {files} archivos ({size} MB).',
-  'publish.unexpectedWarn':
-    'Atención: cambiarán {count} archivos además de estos elementos, porque la copia local tiene cambios sin publicar. Revisa la lista antes de enviar.',
-  'publish.removedWarn': 'Se eliminarán {count} archivos publicados de la biblioteca.',
-  'publish.pathsAdded': 'Se añadirán',
-  'publish.pathsChanged': 'Cambiarán',
-  'publish.pathsRemoved': 'Se eliminarán',
-  'publish.prepare': 'Preparar la publicación y comprobar qué cambiará',
-  'publish.confirmSend':
-    '¿Enviar {count} elementos a la biblioteca de Cloudflare? Aparecerán para todos los usuarios de Slidr.',
-  'publish.approveSend': 'Aprobar y enviar a Cloudflare',
-  'publish.cancel': 'Cancelar',
-  'publish.needToken': 'Introduce un token de Cloudflare para enviar.',
-  'publish.log': 'Registro',
+  'publish.uploadNote':
+    'Cada diseño aprobado va a la API de subidas de la biblioteca como un diseño nuevo, con sus diapositivas, sus nombres y sus etiquetas de búsqueda; cada muestra, como su plantilla en otro idioma. La biblioteca lo comprueba con lo que publica y lo guarda hasta que un editor lo acepta; desde ahí se publica.',
+  'publish.keyTitle': 'La clave de la biblioteca',
+  'publish.keyHelp':
+    'La clave del estudio para la API de la biblioteca: studio=<key> en LIBRARY_KEYS de su Worker. Solo se guarda en la memoria de este servidor.',
+  'publish.upload': 'Enviar {count} a la biblioteca',
+  'publish.waiting': 'Espera en la biblioteca como',
+  'publish.refused': 'La biblioteca no lo aceptó: {error}',
+  'publish.openLibrary': 'Las subidas en la biblioteca',
   'form.languages': 'Idiomas',
   'form.sampleLanguages': 'Idiomas en los que escribir la muestra',
   'form.alreadyWritten': 'ya escrito: reescribir',

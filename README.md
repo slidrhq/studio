@@ -1,6 +1,6 @@
 # Slidr Studio
 
-A local web app that makes content for the media library from a request, and publishes the approved work to the library on Cloudflare Pages (docs/media-library.md): ready-made designs for Elements → Designs, and the sample decks of the built-in templates in any content language (a translation, or a rewrite). The server is Python (FastAPI). The pages are React and use the app's own packages: the HTML conversion engine, the template engine, the renderer and the design check.
+A local web app that makes content for the media library from a request, and sends the approved work to the library through its upload API (docs/media-library.md, [Publishing](#publishing)): ready-made designs for Elements → Designs, and the sample decks of the built-in templates in any content language (a translation, or a rewrite). The server is Python (FastAPI). The pages are React and use the app's own packages: the HTML conversion engine, the template engine, the renderer and the design check.
 
 The studio makes and publishes. To see what the library holds, as every installed app reads it, use [Slidr Library](https://github.com/slidrhq/library), which the "Library" tab of the studio opens.
 
@@ -65,20 +65,16 @@ A template request names a built-in template and the languages to write its samp
 
 ## Publishing
 
-Publishing has two steps, and nothing reaches Cloudflare before the second.
+The approved work goes to the library through [Slidr Library](https://github.com/slidrhq/library)'s upload API (its README, "Uploading"), not by publishing the author copy with `pnpm media:publish`. The "Publish" panel sends each approved item as one upload (`server/slidr_manager/uploads.py`, `POST /api/upload`):
 
-1. **Prepare** (the "Publish" panel):
-   - The studio copies into the author copy of the library (`../Slidr-media`, or `SLIDR_MEDIA_DIR`) any published files that copy lacks. A file the copy already has is never touched.
-   - It writes the approved designs into the copy: `elements/designs/managed.json` and `images/designs/<id>.webp`; and the approved template samples into its `templates/catalog.json`.
-   - It runs `apps/desktop/scripts/media-publish.mjs --dry-run --report`, the app's own publishing script, with its staging, manifest and guards.
-   - The panel then shows every file that would be added, changed or removed, and warns about any change that is not one of these designs.
-2. **Confirm.** The script deploys with wrangler. The studio then reads the published manifest back to check the files.
+- a design as `designs: add`: its picture (`images/designs/<id>.webp`), its slide in each language it was made in, its names, its group and the point of its picture's subject, and its search tags in Hebrew and English. The library refuses a design without tags; one made before the plan asked for them gets them by a change asked for in words;
+- a template's sample as `templates: translate`, in its language.
 
-Cancelling, or a failed deploy, puts the author copy back as it was.
+The library checks each against what it publishes, and keeps it, waiting, until an editor accepts it; the panel says the upload each item waits as, with a link to it on the library's page, or each thing the library found wrong. A variant keeps its upload. Publishing the accepted uploads into the library is the library's next step, still to come; the studio's own publication of the author copy (`Library.prepare` and `confirm`, `/api/publish/…`) stays in the server for it, and the panel no longer offers it.
+
+The studio signs in to the API as a program, by its key: `studio=<key>` in the library Worker's `LIBRARY_KEYS`. Give the key in the panel, where it is kept in the server's memory only, or set `SLIDR_LIBRARY_KEY`. `SLIDR_LIBRARY_URL` names the library (`https://library.slidr.workers.dev/`; `http://127.0.0.1:5176/` for its dev server).
 
 Designs from the studio go to their own catalog, `elements/designs/managed.json`, with ids that start with `m-`. They never collide with the hand-authored `index.json`. The app reads both files: names, groups and search tags come from `managed.json`, and an authored design wins on an id clash. A design's `slides` hold a slide for each language it was made in (`he` and `en`, and any other), while its names stay in Hebrew and English; a deck in a language a design was not made in gets the English slide.
-
-Publishing needs a Cloudflare API token with Pages edit rights. Give it in the panel, where it is kept in the server's memory only, or set `CLOUDFLARE_API_TOKEN` in the environment. The account defaults to the library's (`CLOUDFLARE_ACCOUNT_ID` overrides it).
 
 ## The library
 
@@ -86,15 +82,16 @@ The "Library" tab opens [Slidr Library](https://github.com/slidrhq/library) (`VI
 
 ## Settings
 
-| Variable                                               | Default                          |
-| ------------------------------------------------------ | -------------------------------- |
-| `SLIDR_STUDIO_PORT`, `SLIDR_STUDIO_HOST`               | `8765`, `127.0.0.1`              |
-| `SLIDR_STUDIO_DATA`                                    | `.data`                          |
-| `SLIDR_MEDIA_DIR`                                      | `../Slidr-media`                 |
-| `SLIDR_MEDIA_URL`                                      | `https://slidr-media.pages.dev/` |
-| `SLIDR_STUDIO_MAX_CLAUDE`, `_MAX_CODEX`, `_MAX_RENDER` | `4`, `4`, `2`                    |
-| `SLIDR_STUDIO_BROWSER`                                 | `msedge` (a Playwright channel)  |
-| `CLAUDE_PATH`, `CODEX_PATH`, `NODE_PATH_EXE`           | found on the PATH                |
+| Variable                                               | Default                                    |
+| ------------------------------------------------------ | ------------------------------------------ |
+| `SLIDR_STUDIO_PORT`, `SLIDR_STUDIO_HOST`               | `8765`, `127.0.0.1`                        |
+| `SLIDR_STUDIO_DATA`                                    | `.data`                                    |
+| `SLIDR_MEDIA_DIR`                                      | `../Slidr-media`                           |
+| `SLIDR_MEDIA_URL`                                      | `https://slidr-media.pages.dev/`           |
+| `SLIDR_LIBRARY_URL`, `SLIDR_LIBRARY_KEY`               | `https://library.slidr.workers.dev/`, none |
+| `SLIDR_STUDIO_MAX_CLAUDE`, `_MAX_CODEX`, `_MAX_RENDER` | `4`, `4`, `2`                              |
+| `SLIDR_STUDIO_BROWSER`                                 | `msedge` (a Playwright channel)            |
+| `CLAUDE_PATH`, `CODEX_PATH`, `NODE_PATH_EXE`           | found on the PATH                          |
 
 Each request lives in `.data/requests/<rid>/`. Each variant's working folder, `<vid>/work/`, holds the concept (`brief.json`), the picture (`subject.png`), an HTML file for each language, and `renders/r<n>/`, a folder for each revision with its renders (`<lang>-full.png`, `<lang>-thumb.png`) and `result.json`. A template variant's folder holds `brief.json`, `template.json`, `template.md`, `en.json`, `he.json` and its `<lang>.json`, and its renders are `s01-full.png`, `s01-thumb.png`… and `sheet.png`. The last three revisions are kept.
 

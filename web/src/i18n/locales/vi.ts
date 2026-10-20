@@ -52,31 +52,16 @@ const words: Record<MessageKey, string> = {
   'publish.close': 'Đóng',
   'publish.itemsToPublish': '{count} mục để xuất bản',
   'publish.noApproved': 'Chưa có mục nào được duyệt',
-  'publish.noteDesigns1': 'Các thiết kế dựng sẵn được đưa vào danh mục riêng, ',
-  'publish.noteDesigns2': ', với ID bắt đầu bằng ',
-  'publish.noteDesigns3': ', cùng với các thiết kế viết tay. Bản mẫu được đưa vào danh mục mẫu, ',
-  'publish.noteDesigns4':
-    ', mỗi ngôn ngữ ở một chỗ riêng, và không có gì khác trong tệp thay đổi. Việc xuất bản chạy qua lệnh ',
-  'publish.noteDesigns5': ' của kho mã, từ bản sao tại ',
-  'publish.tokenTitle': 'Token Cloudflare',
-  'publish.tokenHelp':
-    'Token API có quyền Cloudflare Pages: Edit. Chỉ được giữ trong bộ nhớ của máy chủ, không bao giờ lưu vào ổ đĩa.',
   'publish.save': 'Lưu',
-  'publish.reportSummary':
-    'So với thư viện đã xuất bản ({before} tệp): thêm {added}, thay đổi {changed}, xóa {removed}. Sau khi xuất bản, thư viện sẽ có {files} tệp ({size} MB).',
-  'publish.unexpectedWarn':
-    'Lưu ý: {count} tệp sẽ thay đổi ngoài các mục này, vì bản sao cục bộ có thay đổi chưa xuất bản. Hãy xem lại danh sách trước khi gửi.',
-  'publish.removedWarn': '{count} tệp đã xuất bản sẽ bị xóa khỏi thư viện.',
-  'publish.pathsAdded': 'Sẽ được thêm',
-  'publish.pathsChanged': 'Sẽ thay đổi',
-  'publish.pathsRemoved': 'Sẽ bị xóa',
-  'publish.prepare': 'Chuẩn bị xuất bản và kiểm tra những gì sẽ thay đổi',
-  'publish.confirmSend':
-    'Gửi {count} mục lên thư viện Cloudflare? Chúng sẽ hiển thị cho mọi người dùng Slidr.',
-  'publish.approveSend': 'Duyệt và gửi lên Cloudflare',
-  'publish.cancel': 'Hủy',
-  'publish.needToken': 'Nhập token Cloudflare để gửi.',
-  'publish.log': 'Nhật ký',
+  'publish.uploadNote':
+    'Mỗi thiết kế đã duyệt được gửi tới API tải lên của thư viện như một thiết kế mới, kèm các slide, tên và thẻ tìm kiếm; mỗi mẫu được gửi như mẫu của nó bằng một ngôn ngữ khác. Thư viện kiểm tra nó với những gì đang xuất bản và giữ lại cho tới khi một biên tập viên chấp nhận; việc xuất bản diễn ra từ đó.',
+  'publish.keyTitle': 'Khóa của thư viện',
+  'publish.keyHelp':
+    'Khóa của studio cho API của thư viện: studio=<key> trong LIBRARY_KEYS của Worker. Chỉ được giữ trong bộ nhớ của máy chủ này.',
+  'publish.upload': 'Gửi {count} tới thư viện',
+  'publish.waiting': 'Đang chờ trong thư viện với mã',
+  'publish.refused': 'Thư viện không nhận: {error}',
+  'publish.openLibrary': 'Các tải lên trong thư viện',
   'form.languages': 'Ngôn ngữ',
   'form.sampleLanguages': 'Ngôn ngữ để viết bản mẫu',
   'form.alreadyWritten': 'đã có: viết lại',

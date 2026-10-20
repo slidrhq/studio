@@ -53,32 +53,16 @@ const words: Record<MessageKey, string> = {
   'publish.close': 'Закрыть',
   'publish.itemsToPublish': 'Элементов к публикации: {count}',
   'publish.noApproved': 'Нет утверждённых элементов',
-  'publish.noteDesigns1': 'Дизайны попадают в собственный каталог, ',
-  'publish.noteDesigns2': ', с идентификаторами, которые начинаются с ',
-  'publish.noteDesigns3':
-    ', рядом с дизайнами, написанными вручную. Примеры шаблонов попадают в каталог шаблонов, ',
-  'publish.noteDesigns4':
-    ', каждый язык на своём месте, и больше ничего в файле не меняется. Публикация идёт через команду ',
-  'publish.noteDesigns5': ' репозитория, из копии в ',
-  'publish.tokenTitle': 'Токен Cloudflare',
-  'publish.tokenHelp':
-    'API-токен с разрешением Cloudflare Pages: Edit. Хранится только в памяти сервера, не на диске.',
   'publish.save': 'Сохранить',
-  'publish.reportSummary':
-    'По сравнению с опубликованной библиотекой (файлов: {before}): будет добавлено {added}, изменено {changed}, удалено {removed}. После публикации в ней будет файлов: {files} ({size} МБ).',
-  'publish.unexpectedWarn':
-    'Внимание: помимо этих элементов изменится файлов: {count}, потому что в локальной копии есть неопубликованные изменения. Проверьте список перед отправкой.',
-  'publish.removedWarn': 'Опубликованных файлов, которые будут удалены из библиотеки: {count}.',
-  'publish.pathsAdded': 'Будут добавлены',
-  'publish.pathsChanged': 'Будут изменены',
-  'publish.pathsRemoved': 'Будут удалены',
-  'publish.prepare': 'Подготовить публикацию и проверить изменения',
-  'publish.confirmSend':
-    'Отправить в библиотеку Cloudflare элементов: {count}? Они появятся у всех пользователей Slidr.',
-  'publish.approveSend': 'Подтвердить и отправить в Cloudflare',
-  'publish.cancel': 'Отмена',
-  'publish.needToken': 'Введите токен Cloudflare, чтобы отправить.',
-  'publish.log': 'Журнал',
+  'publish.uploadNote':
+    'Каждый одобренный дизайн отправляется в API загрузок медиатеки как новый дизайн — со слайдами, названиями и тегами для поиска; каждый образец — как его шаблон на другом языке. Медиатека проверяет его по тому, что она публикует, и хранит, пока редактор его не примет; оттуда он публикуется.',
+  'publish.keyTitle': 'Ключ медиатеки',
+  'publish.keyHelp':
+    'Ключ студии к API медиатеки: studio=<key> в LIBRARY_KEYS её Worker. Хранится только в памяти этого сервера.',
+  'publish.upload': 'Отправить в медиатеку: {count}',
+  'publish.waiting': 'Ждёт в медиатеке как',
+  'publish.refused': 'Медиатека его не приняла: {error}',
+  'publish.openLibrary': 'Загрузки в медиатеке',
   'form.languages': 'Языки',
   'form.sampleLanguages': 'Языки, на которых написать пример',
   'form.alreadyWritten': 'уже написан: переписать',

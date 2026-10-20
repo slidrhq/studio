@@ -53,32 +53,16 @@ const words: Record<MessageKey, string> = {
   'publish.close': 'Tutup',
   'publish.itemsToPublish': '{count} item untuk diterbitkan',
   'publish.noApproved': 'Tidak ada item yang disetujui',
-  'publish.noteDesigns1': 'Desain masuk ke katalognya sendiri, ',
-  'publish.noteDesigns2': ', dengan ID yang diawali ',
-  'publish.noteDesigns3':
-    ', berdampingan dengan desain yang ditulis tangan. Contoh templat masuk ke katalog templat, ',
-  'publish.noteDesigns4':
-    ', setiap bahasa di tempatnya sendiri, dan tidak ada hal lain di file itu yang berubah. Penerbitan berjalan lewat ',
-  'publish.noteDesigns5': ' milik repo, dari salinan di ',
-  'publish.tokenTitle': 'Token Cloudflare',
-  'publish.tokenHelp':
-    'Token API dengan izin Cloudflare Pages: Edit. Hanya disimpan di memori server, tidak pernah di disk.',
   'publish.save': 'Simpan',
-  'publish.reportSummary':
-    'Dibandingkan dengan pustaka yang sudah diterbitkan ({before} file): {added} akan ditambahkan, {changed} akan berubah, {removed} akan dihapus. Setelah diterbitkan, pustaka akan berisi {files} file ({size} MB).',
-  'publish.unexpectedWarn':
-    'Perhatian: {count} file akan berubah di luar item ini, karena salinan lokal memiliki perubahan yang belum diterbitkan. Periksa daftarnya sebelum mengirim.',
-  'publish.removedWarn': '{count} file yang sudah diterbitkan akan dihapus dari pustaka.',
-  'publish.pathsAdded': 'Akan ditambahkan',
-  'publish.pathsChanged': 'Akan berubah',
-  'publish.pathsRemoved': 'Akan dihapus',
-  'publish.prepare': 'Siapkan penerbitan dan periksa apa yang akan berubah',
-  'publish.confirmSend':
-    'Kirim {count} item ke pustaka Cloudflare? Item ini akan muncul untuk semua pengguna Slidr.',
-  'publish.approveSend': 'Setujui dan kirim ke Cloudflare',
-  'publish.cancel': 'Batal',
-  'publish.needToken': 'Masukkan token Cloudflare untuk mengirim.',
-  'publish.log': 'Log',
+  'publish.uploadNote':
+    'Setiap desain yang disetujui dikirim ke API unggahan pustaka sebagai desain baru, dengan slide, nama, dan tag pencariannya; setiap contoh sebagai templatnya dalam bahasa lain. Pustaka memeriksanya terhadap apa yang diterbitkannya dan menyimpannya sampai editor menerimanya; dari sana desain itu diterbitkan.',
+  'publish.keyTitle': 'Kunci pustaka',
+  'publish.keyHelp':
+    'Kunci studio untuk API pustaka: studio=<key> di LIBRARY_KEYS Worker-nya. Hanya disimpan di memori server ini.',
+  'publish.upload': 'Kirim {count} ke pustaka',
+  'publish.waiting': 'Menunggu di pustaka sebagai',
+  'publish.refused': 'Pustaka tidak menerimanya: {error}',
+  'publish.openLibrary': 'Unggahan di pustaka',
   'form.languages': 'Bahasa',
   'form.sampleLanguages': 'Bahasa untuk menulis contoh',
   'form.alreadyWritten': 'sudah ditulis: tulis ulang',

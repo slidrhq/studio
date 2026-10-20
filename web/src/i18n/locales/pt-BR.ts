@@ -53,32 +53,16 @@ const words: Record<MessageKey, string> = {
   'publish.close': 'Fechar',
   'publish.itemsToPublish': '{count} itens para publicar',
   'publish.noApproved': 'Nenhum item aprovado',
-  'publish.noteDesigns1': 'Os designs vão para o catálogo próprio, ',
-  'publish.noteDesigns2': ', com IDs que começam com ',
-  'publish.noteDesigns3':
-    ', junto com os designs escritos à mão. Os exemplos de modelos vão para o catálogo de modelos, ',
-  'publish.noteDesigns4':
-    ', cada idioma no seu lugar, e nada mais no arquivo muda. A publicação roda pelo comando ',
-  'publish.noteDesigns5': ' do repositório, a partir da cópia em ',
-  'publish.tokenTitle': 'Token da Cloudflare',
-  'publish.tokenHelp':
-    'Um token de API com a permissão Cloudflare Pages: Edit. Fica só na memória do servidor, nunca no disco.',
   'publish.save': 'Salvar',
-  'publish.reportSummary':
-    'Em comparação com a biblioteca publicada ({before} arquivos): {added} serão adicionados, {changed} serão alterados e {removed} serão removidos. Depois da publicação ela terá {files} arquivos ({size} MB).',
-  'publish.unexpectedWarn':
-    'Atenção: {count} arquivos serão alterados além destes itens, porque a cópia local tem alterações não publicadas. Revise a lista antes de enviar.',
-  'publish.removedWarn': '{count} arquivos publicados serão removidos da biblioteca.',
-  'publish.pathsAdded': 'Serão adicionados',
-  'publish.pathsChanged': 'Serão alterados',
-  'publish.pathsRemoved': 'Serão removidos',
-  'publish.prepare': 'Preparar a publicação e verificar o que vai mudar',
-  'publish.confirmSend':
-    'Enviar {count} itens para a biblioteca da Cloudflare? Eles aparecerão para todos os usuários do Slidr.',
-  'publish.approveSend': 'Aprovar e enviar para a Cloudflare',
-  'publish.cancel': 'Cancelar',
-  'publish.needToken': 'Informe um token da Cloudflare para enviar.',
-  'publish.log': 'Registro',
+  'publish.uploadNote':
+    'Cada design aprovado vai para a API de envios da biblioteca como um design novo, com seus slides, nomes e tags de busca; cada amostra, como seu modelo em outro idioma. A biblioteca o confere com o que publica e o guarda até que um editor o aceite; a partir daí ele é publicado.',
+  'publish.keyTitle': 'A chave da biblioteca',
+  'publish.keyHelp':
+    'A chave do estúdio para a API da biblioteca: studio=<key> em LIBRARY_KEYS do Worker dela. Fica apenas na memória deste servidor.',
+  'publish.upload': 'Enviar {count} para a biblioteca',
+  'publish.waiting': 'Aguardando na biblioteca como',
+  'publish.refused': 'A biblioteca não o aceitou: {error}',
+  'publish.openLibrary': 'Os envios na biblioteca',
   'form.languages': 'Idiomas',
   'form.sampleLanguages': 'Idiomas para escrever o exemplo',
   'form.alreadyWritten': 'já escrito: reescrever',

@@ -52,32 +52,16 @@ const words: Record<MessageKey, string> = {
   'publish.close': '닫기',
   'publish.itemsToPublish': '게시할 항목 {count}개',
   'publish.noApproved': '승인된 항목 없음',
-  'publish.noteDesigns1': '디자인은 자체 카탈로그인 ',
-  'publish.noteDesigns2': '에 들어가며, ID는 ',
-  'publish.noteDesigns3':
-    ' 접두사로 시작하고 직접 작성한 디자인과 함께 표시됩니다. 템플릿 샘플은 템플릿 카탈로그인 ',
-  'publish.noteDesigns4':
-    '에 언어별로 각각 들어가며, 파일의 다른 부분은 바뀌지 않습니다. 게시는 저장소의 ',
-  'publish.noteDesigns5': ' 명령으로 실행되며, 다음 위치의 사본을 사용합니다: ',
-  'publish.tokenTitle': 'Cloudflare 토큰',
-  'publish.tokenHelp':
-    'Cloudflare Pages: Edit 권한이 있는 API 토큰입니다. 서버 메모리에만 보관되며 디스크에는 저장되지 않습니다.',
   'publish.save': '저장',
-  'publish.reportSummary':
-    '게시된 라이브러리({before}개 파일)와 비교: {added}개 추가, {changed}개 변경, {removed}개 제거 예정입니다. 게시 후에는 파일 {files}개({size}MB)가 됩니다.',
-  'publish.unexpectedWarn':
-    '주의: 로컬 사본에 게시되지 않은 변경 사항이 있어 이 항목들 외에 파일 {count}개가 더 변경됩니다. 전송하기 전에 목록을 확인하세요.',
-  'publish.removedWarn': '게시된 파일 {count}개가 라이브러리에서 제거됩니다.',
-  'publish.pathsAdded': '추가 예정',
-  'publish.pathsChanged': '변경 예정',
-  'publish.pathsRemoved': '제거 예정',
-  'publish.prepare': '게시 준비 및 변경 내용 확인',
-  'publish.confirmSend':
-    '항목 {count}개를 Cloudflare 라이브러리로 보낼까요? 모든 Slidr 사용자에게 표시됩니다.',
-  'publish.approveSend': '승인하고 Cloudflare로 전송',
-  'publish.cancel': '취소',
-  'publish.needToken': '전송하려면 Cloudflare 토큰을 입력하세요.',
-  'publish.log': '로그',
+  'publish.uploadNote':
+    '승인된 각 디자인은 슬라이드, 이름, 검색 태그와 함께 새 디자인으로 미디어 라이브러리의 업로드 API에 전송되고, 각 샘플은 해당 템플릿의 다른 언어판으로 전송됩니다. 라이브러리는 게시된 내용과 대조해 확인하고 편집자가 승인할 때까지 보관하며, 게시는 거기서 이루어집니다.',
+  'publish.keyTitle': '미디어 라이브러리 키',
+  'publish.keyHelp':
+    '미디어 라이브러리 API에 대한 스튜디오의 키: Worker의 LIBRARY_KEYS에 있는 studio=<key>. 이 서버의 메모리에만 보관됩니다.',
+  'publish.upload': '{count}개를 미디어 라이브러리로 보내기',
+  'publish.waiting': '미디어 라이브러리에서 대기 중:',
+  'publish.refused': '미디어 라이브러리가 받지 않았습니다: {error}',
+  'publish.openLibrary': '미디어 라이브러리의 업로드',
   'form.languages': '언어',
   'form.sampleLanguages': '샘플을 작성할 언어',
   'form.alreadyWritten': '이미 작성됨: 다시 작성',

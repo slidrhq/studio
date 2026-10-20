@@ -52,31 +52,16 @@ const words: Record<MessageKey, string> = {
   'publish.close': 'إغلاق',
   'publish.itemsToPublish': '{count} عناصر للنشر',
   'publish.noApproved': 'لا توجد عناصر معتمدة',
-  'publish.noteDesigns1': 'تدخل التصاميم في فهرسها الخاص، ',
-  'publish.noteDesigns2': '، بمعرّفات تبدأ بـ ',
-  'publish.noteDesigns3':
-    '، إلى جانب التصاميم المكتوبة يدويًا. أما نماذج القوالب فتدخل في فهرس القوالب، ',
-  'publish.noteDesigns4':
-    '، وكل لغة في مكانها، ولا يتغير أي شيء آخر في الملف. يتم النشر عبر الأمر ',
-  'publish.noteDesigns5': ' في المستودع، من النسخة الموجودة في ',
-  'publish.tokenTitle': 'رمز Cloudflare',
-  'publish.tokenHelp':
-    'رمز API بصلاحية Cloudflare Pages: Edit. يُحفظ في ذاكرة الخادم فقط، ولا يُكتب على القرص أبدًا.',
   'publish.save': 'حفظ',
-  'publish.reportSummary':
-    'مقارنةً بالمكتبة المنشورة ({before} ملفًا): سيتم إضافة {added}، وتغيير {changed}، وحذف {removed}. بعد النشر ستحتوي على {files} ملفًا ({size} ميغابايت).',
-  'publish.unexpectedWarn':
-    'تنبيه: سيتغير {count} ملفًا إضافيًا غير هذه العناصر، لأن النسخة المحلية فيها تغييرات غير منشورة. راجع القائمة قبل الإرسال.',
-  'publish.removedWarn': 'سيتم حذف {count} ملفًا منشورًا من المكتبة.',
-  'publish.pathsAdded': 'ستُضاف',
-  'publish.pathsChanged': 'ستتغير',
-  'publish.pathsRemoved': 'ستُحذف',
-  'publish.prepare': 'التحضير للنشر وفحص ما سيتغير',
-  'publish.confirmSend': 'إرسال {count} عناصر إلى مكتبة Cloudflare؟ ستظهر لجميع مستخدمي Slidr.',
-  'publish.approveSend': 'الموافقة والإرسال إلى Cloudflare',
-  'publish.cancel': 'إلغاء',
-  'publish.needToken': 'أدخل رمز Cloudflare للإرسال.',
-  'publish.log': 'السجل',
+  'publish.uploadNote':
+    'يُرسَل كل تصميم معتمد إلى واجهة الرفع في المكتبة كتصميم جديد، مع شرائحه وأسمائه ووسوم البحث الخاصة به، وكل عينة كقالبها بلغة إضافية. تفحصه المكتبة مقابل ما تنشره وتحتفظ به حتى يقبله محرر، ومن هناك يُنشر.',
+  'publish.keyTitle': 'مفتاح المكتبة',
+  'publish.keyHelp':
+    'مفتاح الاستوديو لواجهة المكتبة: ⁦studio=<key>⁩ في ⁦LIBRARY_KEYS⁩ الخاص بـ Worker. يُحفظ في ذاكرة هذا الخادم فقط.',
+  'publish.upload': 'إرسال {count} إلى المكتبة',
+  'publish.waiting': 'ينتظر في المكتبة باسم',
+  'publish.refused': 'لم تقبله المكتبة: {error}',
+  'publish.openLibrary': 'الرفعات في المكتبة',
   'form.languages': 'اللغات',
   'form.sampleLanguages': 'اللغات التي سيُكتب بها النموذج',
   'form.alreadyWritten': 'مكتوب بالفعل: إعادة كتابة',

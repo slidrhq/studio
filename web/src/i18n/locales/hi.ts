@@ -53,32 +53,16 @@ const words: Record<MessageKey, string> = {
   'publish.close': 'बंद करें',
   'publish.itemsToPublish': 'प्रकाशित करने के लिए {count} आइटम',
   'publish.noApproved': 'कोई मंज़ूर आइटम नहीं',
-  'publish.noteDesigns1': 'डिज़ाइन अपने अलग कैटलॉग में जाते हैं, ',
-  'publish.noteDesigns2': ', जिनकी ID इससे शुरू होती है: ',
-  'publish.noteDesigns3':
-    ', हाथ से लिखे डिज़ाइनों के साथ। टेम्पलेट के सैंपल टेम्पलेट कैटलॉग में जाते हैं, ',
-  'publish.noteDesigns4':
-    ', हर भाषा अपनी जगह पर, और फ़ाइल में और कुछ नहीं बदलता। प्रकाशन रिपॉज़िटरी के ',
-  'publish.noteDesigns5': ' से चलता है, इस कॉपी से: ',
-  'publish.tokenTitle': 'Cloudflare टोकन',
-  'publish.tokenHelp':
-    'Cloudflare Pages: Edit अनुमति वाला API टोकन। यह केवल सर्वर की मेमोरी में रहता है, डिस्क पर कभी नहीं।',
   'publish.save': 'सहेजें',
-  'publish.reportSummary':
-    'प्रकाशित लाइब्रेरी ({before} फ़ाइलें) की तुलना में: {added} जुड़ेंगी, {changed} बदलेंगी, {removed} हटेंगी। प्रकाशन के बाद उसमें {files} फ़ाइलें ({size} MB) होंगी।',
-  'publish.unexpectedWarn':
-    'ध्यान दें: इन आइटम के अलावा {count} फ़ाइलें और बदलेंगी, क्योंकि लोकल कॉपी में अप्रकाशित बदलाव हैं। भेजने से पहले सूची देख लें।',
-  'publish.removedWarn': 'प्रकाशित की गई {count} फ़ाइलें लाइब्रेरी से हटा दी जाएँगी।',
-  'publish.pathsAdded': 'जुड़ेंगी',
-  'publish.pathsChanged': 'बदलेंगी',
-  'publish.pathsRemoved': 'हटेंगी',
-  'publish.prepare': 'प्रकाशन तैयार करें और देखें कि क्या बदलेगा',
-  'publish.confirmSend':
-    '{count} आइटम Cloudflare की लाइब्रेरी में भेजें? वे Slidr के सभी उपयोगकर्ताओं को दिखेंगे।',
-  'publish.approveSend': 'मंज़ूर करें और Cloudflare को भेजें',
-  'publish.cancel': 'रद्द करें',
-  'publish.needToken': 'भेजने के लिए Cloudflare टोकन दर्ज करें।',
-  'publish.log': 'लॉग',
+  'publish.uploadNote':
+    'हर स्वीकृत डिज़ाइन लाइब्रेरी के अपलोड API पर नए डिज़ाइन के रूप में जाता है, अपनी स्लाइडों, नामों और खोज टैग के साथ; हर नमूना अपने टेम्पलेट के रूप में किसी दूसरी भाषा में। लाइब्रेरी उसे अपनी प्रकाशित सामग्री से जाँचती है और तब तक रखती है जब तक कोई संपादक उसे स्वीकार न करे; वहीं से वह प्रकाशित होता है।',
+  'publish.keyTitle': 'लाइब्रेरी की कुंजी',
+  'publish.keyHelp':
+    'लाइब्रेरी के API के लिए स्टूडियो की कुंजी: उसके Worker की LIBRARY_KEYS में studio=<key>। यह केवल इसी सर्वर की मेमोरी में रहती है।',
+  'publish.upload': '{count} लाइब्रेरी को भेजें',
+  'publish.waiting': 'लाइब्रेरी में इस नाम से प्रतीक्षा में',
+  'publish.refused': 'लाइब्रेरी ने इसे स्वीकार नहीं किया: {error}',
+  'publish.openLibrary': 'लाइब्रेरी में अपलोड',
   'form.languages': 'भाषाएँ',
   'form.sampleLanguages': 'जिन भाषाओं में सैंपल लिखना है',
   'form.alreadyWritten': 'पहले से लिखा है: दोबारा लिखें',

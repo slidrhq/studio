@@ -51,6 +51,7 @@ from .templates import (
     encode_catalog,
     merge_sample,
 )
+from .uploads import LibraryApi, UploadError, design_upload, sample_upload
 
 MANAGED = "elements/designs/managed.json"
 INDEX = "elements/designs/index.json"
@@ -411,6 +412,37 @@ class Library:
         self._write(path, data)
         self._log(f"{TEMPLATES}: {len(data) / 1024 / 1024:.1f} MB.")
         return others
+
+    # ------------------------------------------------------------------ uploading
+
+    async def upload(self, vids: list[str]) -> list[dict]:
+        """Sends approved work to the library's upload API (`uploads.py`), one upload each: a
+        design as `designs: add`, a template's sample as `templates: translate`. Each item says
+        the upload it now waits as, or why the library did not take it; a variant keeps its
+        upload (`variant["upload"]`), so it is not sent twice."""
+        api = LibraryApi(self.settings.library_url, self.settings.library_key)
+        results: list[dict] = []
+        for vid in vids:
+            variant = self.store.variants.get(vid)
+            if not variant:
+                continue
+            item: dict[str, Any] = {"variantId": vid}
+            try:
+                if variant.get("kind") == "template":
+                    template_id, lang, sample = self._sample_record(variant)
+                    answer = await api.send(sample_upload(template_id, lang, sample))
+                else:
+                    record, webp = self._design_record(variant)
+                    answer = await api.send(design_upload(record), {"picture": (webp, "image/webp")})
+                variant["upload"] = {"id": answer["id"], "status": answer.get("status"), "at": now()}
+                self.store.save_variant(variant)
+                item.update(uploadId=answer["id"], status=answer.get("status"), missing=answer.get("missing", []))
+            except UploadError as error:
+                item.update(error=str(error), issues=error.issues)
+            except LibraryError as error:
+                item.update(error=str(error), issues=[])
+            results.append(item)
+        return results
 
     async def prepare(self, vids: list[str]) -> None:
         async with self._lock:

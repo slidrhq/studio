@@ -53,32 +53,16 @@ const words: Record<MessageKey, string> = {
   'publish.close': 'Schließen',
   'publish.itemsToPublish': '{count} Elemente zu veröffentlichen',
   'publish.noApproved': 'Keine freigegebenen Elemente',
-  'publish.noteDesigns1': 'Designs kommen in einen eigenen Katalog, ',
-  'publish.noteDesigns2': ', mit IDs, die mit ',
-  'publish.noteDesigns3':
-    ' beginnen, neben den handgeschriebenen Designs. Vorlagenbeispiele kommen in den Vorlagenkatalog, ',
-  'publish.noteDesigns4':
-    ', jede Sprache an ihren eigenen Platz, und sonst ändert sich nichts in der Datei. Die Veröffentlichung läuft über ',
-  'publish.noteDesigns5': ' des Repos, aus der Kopie unter ',
-  'publish.tokenTitle': 'Cloudflare-Token',
-  'publish.tokenHelp':
-    'Ein API-Token mit der Berechtigung „Cloudflare Pages: Edit“. Wird nur im Arbeitsspeicher des Servers gehalten, nie auf der Festplatte.',
   'publish.save': 'Speichern',
-  'publish.reportSummary':
-    'Im Vergleich zur veröffentlichten Bibliothek ({before} Dateien): {added} werden hinzugefügt, {changed} werden geändert, {removed} werden entfernt. Nach der Veröffentlichung enthält sie {files} Dateien ({size} MB).',
-  'publish.unexpectedWarn':
-    'Achtung: {count} Dateien werden über diese Elemente hinaus geändert, weil die lokale Kopie unveröffentlichte Änderungen enthält. Prüfen Sie die Liste vor dem Senden.',
-  'publish.removedWarn': '{count} veröffentlichte Dateien werden aus der Bibliothek entfernt.',
-  'publish.pathsAdded': 'Werden hinzugefügt',
-  'publish.pathsChanged': 'Werden geändert',
-  'publish.pathsRemoved': 'Werden entfernt',
-  'publish.prepare': 'Veröffentlichung vorbereiten und Änderungen prüfen',
-  'publish.confirmSend':
-    '{count} Elemente an die Cloudflare-Bibliothek senden? Sie erscheinen bei allen Slidr-Nutzern.',
-  'publish.approveSend': 'Freigeben und an Cloudflare senden',
-  'publish.cancel': 'Abbrechen',
-  'publish.needToken': 'Geben Sie zum Senden ein Cloudflare-Token ein.',
-  'publish.log': 'Protokoll',
+  'publish.uploadNote':
+    'Jedes freigegebene Design geht als neues Design an die Upload-API der Bibliothek, mit seinen Folien, Namen und Suchbegriffen; jedes Beispiel als seine Vorlage in einer weiteren Sprache. Die Bibliothek prüft es gegen das, was sie veröffentlicht, und hält es zurück, bis es jemand aus der Redaktion annimmt; von dort wird es veröffentlicht.',
+  'publish.keyTitle': 'Schlüssel der Bibliothek',
+  'publish.keyHelp':
+    'Der Schlüssel des Studios zur API der Bibliothek: studio=<key> in LIBRARY_KEYS ihres Workers. Wird nur im Speicher dieses Servers gehalten.',
+  'publish.upload': '{count} an die Bibliothek senden',
+  'publish.waiting': 'Wartet in der Bibliothek als',
+  'publish.refused': 'Die Bibliothek hat es nicht angenommen: {error}',
+  'publish.openLibrary': 'Die Uploads in der Bibliothek',
   'form.languages': 'Sprachen',
   'form.sampleLanguages': 'Sprachen für das Beispiel',
   'form.alreadyWritten': 'schon geschrieben: neu schreiben',

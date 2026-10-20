@@ -53,32 +53,16 @@ const words: Record<MessageKey, string> = {
   'publish.close': '閉じる',
   'publish.itemsToPublish': '公開する項目: {count} 件',
   'publish.noApproved': '承認済みの項目はありません',
-  'publish.noteDesigns1': 'デザインは専用のカタログ ',
-  'publish.noteDesigns2': ' に、',
-  'publish.noteDesigns3':
-    ' で始まる ID で追加され、手書きのデザインと並びます。テンプレートのサンプルはテンプレートカタログ ',
-  'publish.noteDesigns4':
-    ' の言語ごとの場所に入り、ファイル内のそれ以外は変更されません。公開はリポジトリの ',
-  'publish.noteDesigns5': ' で、次の場所にあるコピーから実行されます: ',
-  'publish.tokenTitle': 'Cloudflare トークン',
-  'publish.tokenHelp':
-    'Cloudflare Pages: Edit 権限を持つ API トークン。サーバーのメモリ上にのみ保持され、ディスクには保存されません。',
   'publish.save': '保存',
-  'publish.reportSummary':
-    '公開済みライブラリ（{before} ファイル）との比較: 追加 {added}、変更 {changed}、削除 {removed}。公開後は {files} ファイル（{size} MB）になります。',
-  'publish.unexpectedWarn':
-    '注意: ローカルコピーに未公開の変更があるため、これらの項目以外にも {count} ファイルが変更されます。送信前に一覧を確認してください。',
-  'publish.removedWarn': '公開済みの {count} ファイルがライブラリから削除されます。',
-  'publish.pathsAdded': '追加されるもの',
-  'publish.pathsChanged': '変更されるもの',
-  'publish.pathsRemoved': '削除されるもの',
-  'publish.prepare': '公開を準備して変更内容を確認',
-  'publish.confirmSend':
-    '{count} 件を Cloudflare のライブラリに送信しますか？ すべての Slidr ユーザーに表示されます。',
-  'publish.approveSend': '承認して Cloudflare に送信',
-  'publish.cancel': 'キャンセル',
-  'publish.needToken': '送信するには Cloudflare トークンを入力してください。',
-  'publish.log': 'ログ',
+  'publish.uploadNote':
+    '承認された各デザインは、スライド・名前・検索タグとともに新しいデザインとしてメディアライブラリのアップロード API に送られます。各サンプルは、そのテンプレートの別言語版として送られます。ライブラリは公開中の内容と照らし合わせて確認し、編集者が承認するまで保管します。公開はそこから行われます。',
+  'publish.keyTitle': 'メディアライブラリのキー',
+  'publish.keyHelp':
+    'メディアライブラリの API に対するスタジオのキー：Worker の LIBRARY_KEYS にある studio=<key>。このサーバーのメモリにのみ保持されます。',
+  'publish.upload': '{count} 件をメディアライブラリに送る',
+  'publish.waiting': 'メディアライブラリで待機中：',
+  'publish.refused': 'メディアライブラリに受け付けられませんでした：{error}',
+  'publish.openLibrary': 'メディアライブラリのアップロード',
   'form.languages': '言語',
   'form.sampleLanguages': 'サンプルを作成する言語',
   'form.alreadyWritten': '作成済み: 書き直す',

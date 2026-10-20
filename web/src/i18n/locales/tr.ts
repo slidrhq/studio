@@ -53,32 +53,16 @@ const words: Record<MessageKey, string> = {
   'publish.close': 'Kapat',
   'publish.itemsToPublish': 'Yayınlanacak {count} öğe',
   'publish.noApproved': 'Onaylanmış öğe yok',
-  'publish.noteDesigns1': 'Tasarımlar kendi kataloğuna girer: ',
-  'publish.noteDesigns2': '; kimlikleri şununla başlar: ',
-  'publish.noteDesigns3':
-    '. El yazımı tasarımların yanında yer alırlar. Şablon örnekleri şablon kataloğuna girer: ',
-  'publish.noteDesigns4':
-    ', her dil kendi yerine; dosyada başka hiçbir şey değişmez. Yayın, deponun şu komutuyla çalışır: ',
-  'publish.noteDesigns5': ', şu konumdaki kopyadan: ',
-  'publish.tokenTitle': 'Cloudflare belirteci',
-  'publish.tokenHelp':
-    'Cloudflare Pages: Edit iznine sahip bir API belirteci. Yalnızca sunucunun belleğinde tutulur, diske asla yazılmaz.',
   'publish.save': 'Kaydet',
-  'publish.reportSummary':
-    'Yayınlanmış kütüphaneyle karşılaştırma ({before} dosya): {added} eklenecek, {changed} değişecek, {removed} kaldırılacak. Yayından sonra {files} dosya ({size} MB) olacak.',
-  'publish.unexpectedWarn':
-    'Dikkat: yerel kopyada yayınlanmamış değişiklikler olduğundan bu öğelerin dışında {count} dosya daha değişecek. Göndermeden önce listeyi inceleyin.',
-  'publish.removedWarn': 'Yayınlanmış {count} dosya kütüphaneden kaldırılacak.',
-  'publish.pathsAdded': 'Eklenecek',
-  'publish.pathsChanged': 'Değişecek',
-  'publish.pathsRemoved': 'Kaldırılacak',
-  'publish.prepare': 'Yayını hazırla ve nelerin değişeceğini kontrol et',
-  'publish.confirmSend':
-    '{count} öğe Cloudflare kütüphanesine gönderilsin mi? Tüm Slidr kullanıcılarına görünecekler.',
-  'publish.approveSend': 'Onayla ve Cloudflare’a gönder',
-  'publish.cancel': 'İptal',
-  'publish.needToken': 'Göndermek için bir Cloudflare belirteci girin.',
-  'publish.log': 'Günlük',
+  'publish.uploadNote':
+    "Onaylanan her tasarım, slaytları, adları ve arama etiketleriyle birlikte yeni bir tasarım olarak kütüphanenin yükleme API'sine gider; her örnek, şablonunun başka bir dildeki hâli olarak. Kütüphane onu yayınladıklarıyla karşılaştırarak denetler ve bir editör kabul edene kadar saklar; yayın oradan yapılır.",
+  'publish.keyTitle': 'Kütüphanenin anahtarı',
+  'publish.keyHelp':
+    "Stüdyonun kütüphane API'sine anahtarı: Worker'ının LIBRARY_KEYS değerindeki studio=<key>. Yalnızca bu sunucunun belleğinde tutulur.",
+  'publish.upload': '{count} öğeyi kütüphaneye gönder',
+  'publish.waiting': 'Kütüphanede şu adla bekliyor:',
+  'publish.refused': 'Kütüphane kabul etmedi: {error}',
+  'publish.openLibrary': 'Kütüphanedeki yüklemeler',
   'form.languages': 'Diller',
   'form.sampleLanguages': 'Örneğin yazılacağı diller',
   'form.alreadyWritten': 'zaten yazılmış: yeniden yaz',

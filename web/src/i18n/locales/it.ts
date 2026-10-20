@@ -53,32 +53,16 @@ const words: Record<MessageKey, string> = {
   'publish.close': 'Chiudi',
   'publish.itemsToPublish': '{count} elementi da pubblicare',
   'publish.noApproved': 'Nessun elemento approvato',
-  'publish.noteDesigns1': 'I design vanno nel loro catalogo, ',
-  'publish.noteDesigns2': ', con ID che iniziano con ',
-  'publish.noteDesigns3':
-    ', accanto ai design scritti a mano. Gli esempi dei modelli vanno nel catalogo dei modelli, ',
-  'publish.noteDesigns4':
-    ", ogni lingua al suo posto, e nient'altro nel file cambia. La pubblicazione passa da ",
-  'publish.noteDesigns5': ' del repository, dalla copia in ',
-  'publish.tokenTitle': 'Token di Cloudflare',
-  'publish.tokenHelp':
-    'Un token API con il permesso Cloudflare Pages: Edit. Resta solo nella memoria del server, mai su disco.',
   'publish.save': 'Salva',
-  'publish.reportSummary':
-    'Rispetto alla libreria pubblicata ({before} file): {added} verranno aggiunti, {changed} cambieranno, {removed} verranno rimossi. Dopo la pubblicazione conterrà {files} file ({size} MB).',
-  'publish.unexpectedWarn':
-    "Attenzione: {count} file cambieranno oltre a questi elementi, perché la copia locale ha modifiche non pubblicate. Controlla l'elenco prima di inviare.",
-  'publish.removedWarn': '{count} file pubblicati verranno rimossi dalla libreria.',
-  'publish.pathsAdded': 'Verranno aggiunti',
-  'publish.pathsChanged': 'Cambieranno',
-  'publish.pathsRemoved': 'Verranno rimossi',
-  'publish.prepare': 'Prepara la pubblicazione e controlla cosa cambierà',
-  'publish.confirmSend':
-    'Inviare {count} elementi alla libreria su Cloudflare? Saranno visibili a tutti gli utenti di Slidr.',
-  'publish.approveSend': 'Approva e invia a Cloudflare',
-  'publish.cancel': 'Annulla',
-  'publish.needToken': 'Inserisci un token di Cloudflare per inviare.',
-  'publish.log': 'Registro',
+  'publish.uploadNote':
+    'Ogni design approvato va all’API di caricamento della libreria come nuovo design, con le sue slide, i suoi nomi e i suoi tag di ricerca; ogni esempio come il suo modello in un’altra lingua. La libreria lo verifica rispetto a ciò che pubblica e lo tiene finché un editor non lo accetta; da lì viene pubblicato.',
+  'publish.keyTitle': 'La chiave della libreria',
+  'publish.keyHelp':
+    'La chiave dello studio per l’API della libreria: studio=<key> in LIBRARY_KEYS del suo Worker. Tenuta solo nella memoria di questo server.',
+  'publish.upload': 'Invia {count} alla libreria',
+  'publish.waiting': 'In attesa nella libreria come',
+  'publish.refused': 'La libreria non l’ha accettato: {error}',
+  'publish.openLibrary': 'I caricamenti nella libreria',
   'form.languages': 'Lingue',
   'form.sampleLanguages': "Lingue in cui scrivere l'esempio",
   'form.alreadyWritten': 'già scritto: riscrivi',

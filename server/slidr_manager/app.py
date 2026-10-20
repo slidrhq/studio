@@ -82,6 +82,11 @@ class CloudflareSettings(BaseModel):
     accountId: str = Field(default="", max_length=64)
 
 
+class LibrarySettings(BaseModel):
+    key: str = Field(default="", max_length=400)
+    url: str = Field(default="", max_length=400)
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings()
     bus = EventBus()
@@ -130,6 +135,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "accountId": settings.cloudflare_account_id,
                 "token": bool(settings.cloudflare_token),
             },
+            "library": {"url": settings.library_url, "key": bool(settings.library_key)},
             "renderUrl": settings.render_url,
             "web": settings.web_dist.is_dir(),
         }
@@ -298,6 +304,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return FileResponse(path, headers={"Cache-Control": "no-store"})
 
     # ------------------------------------------------------------------ publishing
+
+    @app.post("/api/upload")
+    async def upload(body: PublishItems) -> dict:
+        """Sends the approved work (or the variants named) to the library's upload API."""
+        vids = body.variantIds
+        if vids is None:
+            vids = [v["id"] for v in store.variants.values() if v.get("approved") and not v.get("discarded")]
+        return {"items": await library.upload(vids)}
+
+    @app.post("/api/settings/library")
+    async def library_settings(body: LibrarySettings) -> dict:
+        # Kept in this process's memory only; never written to disk.
+        settings.library_key = body.key.strip() or settings.library_key
+        if body.url.strip():
+            settings.library_url = body.url.strip()
+        return {"url": settings.library_url, "key": bool(settings.library_key)}
 
     @app.post("/api/publish/prepare")
     async def prepare(body: PublishItems) -> dict:

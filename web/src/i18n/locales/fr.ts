@@ -53,32 +53,16 @@ const words: Record<MessageKey, string> = {
   'publish.close': 'Fermer',
   'publish.itemsToPublish': '{count} éléments à publier',
   'publish.noApproved': 'Aucun élément approuvé',
-  'publish.noteDesigns1': 'Les designs vont dans leur propre catalogue, ',
-  'publish.noteDesigns2': ', avec des identifiants qui commencent par ',
-  'publish.noteDesigns3':
-    ', à côté des designs écrits à la main. Les exemples de modèles vont dans le catalogue des modèles, ',
-  'publish.noteDesigns4':
-    ', chaque langue à sa place, et rien d’autre ne change dans le fichier. La publication passe par la commande ',
-  'publish.noteDesigns5': ' du dépôt, depuis la copie située dans ',
-  'publish.tokenTitle': 'Jeton Cloudflare',
-  'publish.tokenHelp':
-    'Un jeton d’API avec l’autorisation Cloudflare Pages : Edit. Conservé uniquement dans la mémoire du serveur, jamais sur le disque.',
   'publish.save': 'Enregistrer',
-  'publish.reportSummary':
-    'Par rapport à la bibliothèque publiée ({before} fichiers) : {added} seront ajoutés, {changed} seront modifiés, {removed} seront supprimés. Après la publication, elle contiendra {files} fichiers ({size} Mo).',
-  'publish.unexpectedWarn':
-    'Attention : {count} fichiers seront modifiés en plus de ces éléments, car la copie locale contient des changements non publiés. Vérifiez la liste avant d’envoyer.',
-  'publish.removedWarn': '{count} fichiers publiés seront supprimés de la bibliothèque.',
-  'publish.pathsAdded': 'Seront ajoutés',
-  'publish.pathsChanged': 'Seront modifiés',
-  'publish.pathsRemoved': 'Seront supprimés',
-  'publish.prepare': 'Préparer la publication et vérifier ce qui va changer',
-  'publish.confirmSend':
-    'Envoyer {count} éléments à la bibliothèque Cloudflare ? Ils apparaîtront pour tous les utilisateurs de Slidr.',
-  'publish.approveSend': 'Approuver et envoyer à Cloudflare',
-  'publish.cancel': 'Annuler',
-  'publish.needToken': 'Saisissez un jeton Cloudflare pour envoyer.',
-  'publish.log': 'Journal',
+  'publish.uploadNote':
+    'Chaque design approuvé part vers l’API de téléversement de la médiathèque comme nouveau design, avec ses diapositives, ses noms et ses mots-clés de recherche ; chaque exemple, comme son modèle dans une autre langue. La médiathèque le vérifie par rapport à ce qu’elle publie et le garde jusqu’à ce qu’un éditeur l’accepte ; il est publié à partir de là.',
+  'publish.keyTitle': 'La clé de la médiathèque',
+  'publish.keyHelp':
+    'La clé du studio pour l’API de la médiathèque : studio=<key> dans LIBRARY_KEYS de son Worker. Gardée uniquement en mémoire sur ce serveur.',
+  'publish.upload': 'Envoyer {count} à la médiathèque',
+  'publish.waiting': 'En attente dans la médiathèque sous',
+  'publish.refused': 'La médiathèque ne l’a pas accepté : {error}',
+  'publish.openLibrary': 'Les téléversements de la médiathèque',
   'form.languages': 'Langues',
   'form.sampleLanguages': 'Langues dans lesquelles écrire l’exemple',
   'form.alreadyWritten': 'déjà écrit : réécrire',

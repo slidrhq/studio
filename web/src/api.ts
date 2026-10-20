@@ -125,6 +125,8 @@ export interface Variant {
   approved: boolean;
   discarded?: boolean;
   published: { at: number; revision: number } | null;
+  /** The upload it was sent to the library as, when it was (`POST /api/upload`). */
+  upload?: { id: string; status?: string; at: number };
   cost: number;
   updatedAt: number;
 }
@@ -162,6 +164,20 @@ export interface ServerStatus {
   programs: ProgramStatus[];
   media: { dir: string; exists: boolean; url: string };
   cloudflare: { accountId: string; token: boolean };
+  /** Slidr Library, whose upload API takes the approved work, and whether the studio has its key. */
+  library: { url: string; key: boolean };
+}
+
+/** What became of one approved item sent to the library's upload API. */
+export interface UploadItem {
+  variantId: string;
+  /** The upload it waits as, in the library. */
+  uploadId?: string;
+  status?: string;
+  missing?: string[];
+  /** Why the library did not take it, and each issue at its place. */
+  error?: string;
+  issues?: { path: string; message: string; language?: string }[];
 }
 
 export interface LibraryInfo {
@@ -311,6 +327,10 @@ export const api = {
     post('/api/publish/prepare', { variantIds: variantIds ?? null }),
   confirm: () => post('/api/publish/confirm'),
   cancelPublish: () => post('/api/publish/cancel'),
+  upload: (variantIds?: string[]) =>
+    post<{ items: UploadItem[] }>('/api/upload', { variantIds: variantIds ?? null }),
+  librarySettings: (key: string, url = '') =>
+    post<{ url: string; key: boolean }>('/api/settings/library', { key, url }),
   cloudflare: (token: string, accountId: string) =>
     post<{ accountId: string; token: boolean }>('/api/settings/cloudflare', { token, accountId }),
 };

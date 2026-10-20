@@ -229,14 +229,7 @@ export function Studio() {
         ))}
       {publishing && (
         <PublishPanel
-          publish={studio.publish}
-          approved={
-            studio.publish.phase === 'idle'
-              ? approved
-              : studio.publish.items
-                  .map((vid) => studio.variants[vid])
-                  .filter((v) => v !== undefined)
-          }
+          approved={approved}
           status={status}
           onStatus={refreshStatus}
           onClose={() => setPublishing(false)}

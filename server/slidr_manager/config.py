@@ -19,6 +19,8 @@ VENDOR = STUDIO / "vendor"
 #: The Cloudflare account of the media library (docs/media-library.md). Not a secret.
 DEFAULT_ACCOUNT_ID = "d3a1982ae102ceb45926da85e92d6edf"
 DEFAULT_MEDIA_URL = "https://slidr-media.pages.dev/"
+#: Slidr Library, whose upload API takes the studio's work (`uploads.py`).
+DEFAULT_LIBRARY_URL = "https://library.slidr.workers.dev/"
 
 
 def _path(name: str, default: Path) -> Path:
@@ -59,6 +61,15 @@ class Settings:
     #: Kept in memory only, unless it came from the environment.
     cloudflare_token: str | None = field(
         default_factory=lambda: os.environ.get("CLOUDFLARE_API_TOKEN") or None
+    )
+    #: The library whose API the approved work is uploaded to, and the studio's key to it (the
+    #: Worker's `LIBRARY_KEYS`, `studio=<key>`). The key is kept in memory only, unless it came
+    #: from the environment.
+    library_url: str = field(
+        default_factory=lambda: os.environ.get("SLIDR_LIBRARY_URL", DEFAULT_LIBRARY_URL)
+    )
+    library_key: str | None = field(
+        default_factory=lambda: os.environ.get("SLIDR_LIBRARY_KEY") or None
     )
 
     @property
