@@ -1,0 +1,11 @@
+{
+  // The app's compiler options (tsconfig.base.json of github.com/slidrhq/app): the app's modules
+  // these pages import are checked with the options they are written for.
+  "extends": "../../app/tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "types": ["vite/client", "node"]
+  },
+  "include": ["src", "vite.config.ts"]
+}

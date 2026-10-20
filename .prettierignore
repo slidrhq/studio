@@ -1,0 +1,7 @@
+pnpm-lock.yaml
+dist/
+
+# The server's Python environment, and the studio's local requests and renders.
+server/.venv/
+server/.pytest_cache/
+.data*/

@@ -1,0 +1,4 @@
+# The studio's pages. The app's packages they use come from the app's repository, checked out
+# beside this one (../app), by `link:` (web/package.json).
+packages:
+  - web

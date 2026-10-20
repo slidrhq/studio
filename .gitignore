@@ -1,0 +1,10 @@
+# Requests, variants, renders and logs of the studio: local work, never committed.
+.data/
+.data-*/
+# The server's Python environment and caches.
+server/.venv/
+__pycache__/
+.pytest_cache/
+# Installed packages, and the built pages.
+node_modules/
+dist/
