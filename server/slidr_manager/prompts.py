@@ -45,7 +45,7 @@ The picture is made by an image model from the brief's `image` (`prompt`, and `a
 - a new `"image": {{"prompt": "…", "aspect": "…"}}` makes a new picture;
 - `"imageEdit": "<instruction>"` changes the picture there is (the model draws it again after it, so ask for a change of content or composition, not a pixel fix).
 
-A prompt says what the picture shows and how: subject, framing and where calm space for text falls ("the subject on the right third, a quiet sky on the left"), light, palette, medium. It never asks for text, letters, numbers, logos or watermarks in the picture. You may also change the brief's `name`, `group` and `groupName` when the work changes what the design is; the `id` stays."""
+A prompt says what the picture shows and how: subject, framing and where calm space for text falls ("the subject on the right third, a quiet sky on the left"), light, palette, medium. It never asks for text, letters, numbers, logos or watermarks in the picture. You may also change the brief's `name`, `group`, `groupName` and `tags` (the words its search finds it by, in Hebrew and in English) when the work changes what the design is; the `id` stays."""
 
 WORKFLOW = """## This folder
 
@@ -172,9 +172,19 @@ def _texts(langs: Sequence[str]) -> dict:
     }
 
 
+def tags_schema() -> dict:
+    """The search tags of a design, in Hebrew and English (ADR-108 of the app)."""
+    words = {"type": "array", "minItems": 6, "maxItems": 20, "items": {"type": "string"}}
+    return {
+        "type": "object",
+        "required": list(BASE_LANGUAGES),
+        "properties": {lang: words for lang in BASE_LANGUAGES},
+    }
+
+
 def plan_schema(langs: Sequence[str]) -> dict:
-    """The plan's shape: the copy in every language of the request; the names in Hebrew and
-    English, the two the gallery names its designs in."""
+    """The plan's shape: the copy in every language of the request; the names and the search
+    tags in Hebrew and English, the two the gallery names and searches its designs in."""
     return {
         "type": "object",
         "required": ["concepts"],
@@ -184,12 +194,23 @@ def plan_schema(langs: Sequence[str]) -> dict:
                 "minItems": 1,
                 "items": {
                     "type": "object",
-                    "required": ["slug", "name", "group", "groupName", "concept", "art", "copy", "image"],
+                    "required": [
+                        "slug",
+                        "name",
+                        "group",
+                        "groupName",
+                        "tags",
+                        "concept",
+                        "art",
+                        "copy",
+                        "image",
+                    ],
                     "properties": {
                         "slug": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 40},
                         "name": _texts(BASE_LANGUAGES),
                         "group": {"type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 30},
                         "groupName": _texts(BASE_LANGUAGES),
+                        "tags": tags_schema(),
                         "concept": {"type": "string"},
                         "art": {"type": "string"},
                         "copy": _texts(langs),
@@ -253,6 +274,7 @@ For each concept:
 - `slug`: a short English id (lowercase words joined by hyphens).
 - `name`: what the gallery calls it, in Hebrew and in English (two to four words{names_only}).
 - `group`, `groupName`: its group's id and, for a new group, its name in Hebrew and in English (for an existing one, repeat its names, or your best names for it).
+- `tags`: the words people type into the gallery's search to find it, 8 to 16 in Hebrew and 8 to 16 in English, the most telling first: what it is for (the kind of slide, the occasion or event, the field, the people it addresses) and their synonyms. Each language written natively, with the spellings people type (יום הולדת, יומולדת); English in lower case, Hebrew without niqqud; one to three words each. Not its style, colours or picture, and not the subject of its sample copy unless the design is made for it (a birthday invitation is for birthdays).
 - `concept`: the idea and the focal point, in two or three sentences.
 - `art`: the art direction: the layout and where the picture sits, the palette as hex colours, the font families from the list and how they are used{fonts_for}, the purposeful details.
 - `copy`: the words of the slide in each language of the design, under its code ({codes}), block by block (title, the line under it, details, call to action). Original and specific; each language written natively for its own readers, not translated word for word from another.
@@ -347,7 +369,7 @@ def feedback_prompt(feedback: str, langs: Sequence[str]) -> str:
 {feedback.strip()}
 </studio_feedback>
 
-The person reviewing this design asks for the change above. Make it in {where} and keep everything else that works. When it concerns the picture, the name or the group, change `brief.json` as the contract describes. Reply in one line with what you changed. The app renders the result again and shows it to you."""
+The person reviewing this design asks for the change above. Make it in {where} and keep everything else that works. When it concerns the picture, the name, the group or the tags, change `brief.json` as the contract describes. Reply in one line with what you changed. The app renders the result again and shows it to you."""
 
 
 def fix_prompt(result: dict, folder: str, langs: Sequence[str]) -> str:

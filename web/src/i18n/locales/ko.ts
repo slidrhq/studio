@@ -203,6 +203,7 @@ const words: Record<MessageKey, string> = {
   'variant.changeImage': '이미지 수정',
   'variant.newImage': '새 이미지',
   'variant.concept': '컨셉',
+  'variant.tags': '검색 태그',
   'variant.log': '로그',
   'templateVariant.kindBuild': '빌드',
   'templateVariant.kindContract': '규약',

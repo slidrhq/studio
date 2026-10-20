@@ -325,6 +325,19 @@ export function VariantDetail({
               </p>
             </details>
 
+            {variant.brief.tags &&
+              variant.brief.tags.he.length + variant.brief.tags.en.length > 0 && (
+                <details>
+                  <summary>{t('variant.tags')}</summary>
+                  <p dir="rtl" className="small">
+                    {variant.brief.tags.he.join(' · ')}
+                  </p>
+                  <p dir="ltr" className="muted small">
+                    {variant.brief.tags.en.join(' · ')}
+                  </p>
+                </details>
+              )}
+
             <section className="log-box">
               <h3>{t('variant.log')}</h3>
               <Log variant={variant} />

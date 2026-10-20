@@ -18,7 +18,7 @@ from slidr_manager.app import NewRequest
 from slidr_manager.config import VENDOR, Settings
 from slidr_manager.events import EventBus
 from slidr_manager.instructions import Instructions
-from slidr_manager.library import Library, LibraryError, empty_catalog, merge_design, to_webp
+from slidr_manager.library import Library, LibraryError, design_tags, empty_catalog, merge_design, to_webp
 from slidr_manager.pipeline import Studio, StudioError, has_errors, slugify, unique_id, watched
 from slidr_manager.store import Store, write_json
 from slidr_manager.templates import Templates
@@ -162,6 +162,20 @@ def test_merge_keeps_the_names_a_group_was_published_with():
     second["groupName"] = {"he": "אחר", "en": "Other"}
     merge_design(catalog, second)
     assert catalog["groupNames"]["invites"] == {"he": "הזמנות", "en": "Invitations"}
+
+
+def test_merge_writes_the_tags_of_a_design_and_drops_them_when_it_has_none():
+    catalog = empty_catalog()
+    tagged = design("m-a", "invites")
+    tagged["tags"] = {"he": ["יום הולדת"], "en": ["birthday"]}
+    merge_design(catalog, tagged)
+    assert catalog["tags"] == {"m-a": {"he": ["יום הולדת"], "en": ["birthday"]}}
+    merge_design(catalog, design("m-a", "invites"))
+    assert catalog["tags"] == {}
+    # A catalog published before there were tags gets the key.
+    old = empty_catalog()
+    del old["tags"]
+    assert "tags" in merge_design(old, design("m-b", "invites"))
 
 
 def test_webp_keeps_the_size(tmp_path: Path):
@@ -333,6 +347,27 @@ def test_plan_asks_for_copy_in_every_chosen_language_and_names_in_two():
     assert prompts.plan_schema(BASE)["properties"]["concepts"]["items"]["properties"]["copy"]["required"] == BASE
 
 
+def test_plan_asks_for_the_search_tags_in_hebrew_and_english():
+    concept = prompts.plan_schema(["he", "en", "de"])["properties"]["concepts"]["items"]
+    assert "tags" in concept["required"]
+    assert concept["properties"]["tags"]["required"] == BASE
+    assert "`tags`: the words people type into the gallery's search" in prompts.plan_prompt(
+        "a party", 1, [], [], None, BASE
+    )
+
+
+def test_tags_are_kept_clean_and_in_their_own_letters():
+    tags = design_tags(
+        {
+            "he": ["יוֹם הולדת", "יום הולדת", "birthday", "מסיבה", " עוגה ", 7],
+            "en": ["Birthday", "kids  party", "מסיבה", "cake", "x" * 41],
+        }
+    )
+    assert tags == {"he": ["יום הולדת", "מסיבה", "עוגה"], "en": ["birthday", "kids party", "cake"]}
+    assert design_tags({"he": ["א", "ב"], "en": ["a", "b", "c"]}) is None
+    assert design_tags(None) is None and design_tags({"he": "יום"}) is None
+
+
 # ---------------------------------------------------------------- languages
 
 
@@ -446,6 +481,11 @@ def test_a_design_is_published_with_a_slide_for_every_language(tmp_path: Path):
     catalog = merge_design(empty_catalog(), record)
     assert set(catalog["slides"]["m-x"]) == {"he", "en", "ar", "zh-CN"}
     assert catalog["names"]["m-x"] == {"he": "שם", "en": "Name"}
+    # A brief from before there were tags publishes none; one with them, its tags.
+    assert "tags" not in record and catalog["tags"] == {}
+    variant["brief"]["tags"] = {"he": ["הזמנה", "מסיבה", "אירוע"], "en": ["Invitation", "party", "event"]}
+    record, _ = library._design_record(variant)
+    assert record["tags"] == {"he": ["הזמנה", "מסיבה", "אירוע"], "en": ["invitation", "party", "event"]}
     # Without the English slide it is not published.
     del sides["en"]
     write_json(work / "renders" / "r1" / "result.json", {"publishable": True, "langs": sides, "subject": [5, 6]})

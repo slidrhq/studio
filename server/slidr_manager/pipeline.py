@@ -40,7 +40,7 @@ from PIL import Image
 from . import claude_cli, codex_cli, languages, prompts, template_prompts
 from .config import Settings
 from .instructions import Instructions, quality_bar
-from .library import Library
+from .library import Library, design_tags
 from .render import forget_old, render_dir, snap
 from .store import RUNNING, Store, read_json, write_json
 from .templates import Templates, sample_file, template_brief
@@ -361,6 +361,7 @@ class Studio:
             "name": concept["name"],
             "group": slugify(group or concept.get("group") or "designs"),
             "groupName": concept.get("groupName") or {},
+            "tags": design_tags(concept.get("tags")) or {"he": [], "en": []},
             "concept": concept.get("concept", ""),
             "art": concept.get("art", ""),
             "copy": concept.get("copy", {}),
@@ -555,7 +556,7 @@ class Studio:
         return before != after
 
     async def _apply_brief(self, variant: dict) -> None:
-        """Takes what Claude changed in brief.json: names and group, or a new picture."""
+        """Takes what Claude changed in brief.json: names, group and tags, or a new picture."""
         work = self.store.work_dir(variant)
         brief = read_json(work / "brief.json")
         if not isinstance(brief, dict):
@@ -568,6 +569,9 @@ class Studio:
                 current[key] = {"he": value["he"].strip(), "en": value["en"].strip()}
         if isinstance(brief.get("group"), str) and brief["group"].strip():
             current["group"] = slugify(brief["group"])
+        tags = design_tags(brief.get("tags"))
+        if tags:
+            current["tags"] = tags
         image = brief.get("image")
         edit = brief.get("imageEdit")
         if isinstance(edit, str) and edit.strip():

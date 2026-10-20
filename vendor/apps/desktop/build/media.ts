@@ -201,6 +201,7 @@ export const PUBLISHED_FOLDERS = [
   'fonts',
   'icons',
   'images',
+  'tags',
   'templates',
 ] as const;
 

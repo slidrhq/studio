@@ -207,6 +207,7 @@ const words: Record<MessageKey, string> = {
   'variant.changeImage': '画像を変更',
   'variant.newImage': '新しい画像',
   'variant.concept': 'コンセプト',
+  'variant.tags': '検索タグ',
   'variant.log': 'ログ',
   'templateVariant.kindBuild': 'ビルド',
   'templateVariant.kindContract': '規約',

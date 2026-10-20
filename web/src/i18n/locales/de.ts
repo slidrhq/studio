@@ -210,6 +210,7 @@ const words: Record<MessageKey, string> = {
   'variant.changeImage': 'Bild ändern',
   'variant.newImage': 'Neues Bild',
   'variant.concept': 'Konzept',
+  'variant.tags': 'Suchbegriffe',
   'variant.log': 'Protokoll',
   'templateVariant.kindBuild': 'Aufbau',
   'templateVariant.kindContract': 'Vertrag',

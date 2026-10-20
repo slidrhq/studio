@@ -193,6 +193,7 @@ const words: Record<MessageKey, string> = {
   'variant.changeImage': '修改图片',
   'variant.newImage': '新图片',
   'variant.concept': '构思',
+  'variant.tags': '搜索标签',
   'variant.log': '日志',
   'templateVariant.kindBuild': '生成',
   'templateVariant.kindContract': '规范',

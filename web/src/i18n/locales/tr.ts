@@ -207,6 +207,7 @@ const words: Record<MessageKey, string> = {
   'variant.changeImage': 'Görseli değiştir',
   'variant.newImage': 'Yeni görsel',
   'variant.concept': 'Konsept',
+  'variant.tags': 'Arama etiketleri',
   'variant.log': 'Günlük',
   'templateVariant.kindBuild': 'Oluşturma',
   'templateVariant.kindContract': 'Sözleşme',

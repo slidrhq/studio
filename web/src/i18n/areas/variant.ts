@@ -32,6 +32,7 @@ export const he = {
   'variant.changeImage': 'שנה את התמונה',
   'variant.newImage': 'תמונה חדשה',
   'variant.concept': 'הקונספט',
+  'variant.tags': 'תגיות לחיפוש',
   'variant.log': 'יומן',
 };
 
@@ -72,5 +73,6 @@ export const en: typeof he = {
   'variant.changeImage': 'Change the image',
   'variant.newImage': 'New image',
   'variant.concept': 'Concept',
+  'variant.tags': 'Search tags',
   'variant.log': 'Log',
 };

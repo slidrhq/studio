@@ -198,6 +198,7 @@ const words: Record<MessageKey, string> = {
   'variant.changeImage': 'تغيير الصورة',
   'variant.newImage': 'صورة جديدة',
   'variant.concept': 'الفكرة',
+  'variant.tags': 'كلمات البحث',
   'variant.log': 'السجل',
   'templateVariant.kindBuild': 'البناء',
   'templateVariant.kindContract': 'الشروط',

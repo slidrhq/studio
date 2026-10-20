@@ -207,6 +207,7 @@ const words: Record<MessageKey, string> = {
   'variant.changeImage': 'Ubah gambar',
   'variant.newImage': 'Gambar baru',
   'variant.concept': 'Konsep',
+  'variant.tags': 'Tag pencarian',
   'variant.log': 'Log',
   'templateVariant.kindBuild': 'Pembangunan',
   'templateVariant.kindContract': 'Kontrak',

@@ -28,6 +28,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import time
 import urllib.error
 import urllib.request
@@ -94,16 +95,48 @@ def empty_catalog() -> dict:
         "subjects": {},
         "names": {},
         "sizes": {},
+        "tags": {},
     }
+
+
+# Most search tags kept in a language, and fewest a language must have for any to be kept.
+MOST_TAGS = 20
+FEWEST_TAGS = 3
+
+
+def design_tags(value: Any) -> dict | None:
+    """The search tags of a design as the catalog keeps them (ADR-108 of the app): `{he, en}`,
+    each a list of short words, English in lower case, Hebrew in Hebrew letters and without
+    niqqud, none twice. None when either language has too few."""
+    if not isinstance(value, dict):
+        return None
+    tags: dict[str, list[str]] = {}
+    for lang in ("he", "en"):
+        given = value.get(lang)
+        kept: list[str] = []
+        for tag in given if isinstance(given, list) else []:
+            if not isinstance(tag, str):
+                continue
+            text = " ".join(tag.split())
+            text = re.sub("[֑-ׇ]", "", text) if lang == "he" else text.lower()
+            hebrew = re.search("[א-ת]", text) is not None
+            if not text or len(text) > 40 or hebrew != (lang == "he") or text in kept:
+                continue
+            kept.append(text)
+        if len(kept) < FEWEST_TAGS:
+            return None
+        tags[lang] = kept[:MOST_TAGS]
+    return tags
 
 
 def merge_design(catalog: dict, design: dict) -> dict:
     """Puts one design into a managed catalog, replacing it in place when it is there.
 
     `design`: id, name {he, en}, group, groupName {he, en}, slides {he, en, and any other content
-    language it was made in: ar, de, ja…}, subject [x, y], size [w, h]. The names stay in Hebrew
-    and English, the languages the gallery names its designs in. A design has one group: it
-    leaves any other it was filed under.
+    language it was made in: ar, de, ja…}, subject [x, y], size [w, h], and its search tags
+    {he, en} when it has them. The names and tags stay in Hebrew and English, the languages the
+    gallery names and searches its designs in. A design has one group: it leaves any other it was
+    filed under.
     """
     for key, value in empty_catalog().items():
         catalog.setdefault(key, value)
@@ -122,6 +155,11 @@ def merge_design(catalog: dict, design: dict) -> dict:
     catalog["subjects"][did] = design["subject"]
     catalog["names"][did] = design["name"]
     catalog["sizes"][did] = design["size"]
+    # A design published again without tags keeps none: the app then finds it by its names.
+    if design.get("tags"):
+        catalog["tags"][did] = design["tags"]
+    else:
+        catalog["tags"].pop(did, None)
     # Groups left without designs go.
     for name in [g for g in catalog["groups"] if not catalog["groupIds"].get(g)]:
         catalog["groups"].remove(name)
@@ -299,6 +337,9 @@ class Library:
             "subject": result["subject"],
             "size": list(size),
         }
+        tags = design_tags(brief.get("tags"))
+        if tags:
+            record["tags"] = tags
         return record, webp
 
     async def _prepare_designs(self, variants: list[dict]) -> None:

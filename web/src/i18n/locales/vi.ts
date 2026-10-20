@@ -207,6 +207,7 @@ const words: Record<MessageKey, string> = {
   'variant.changeImage': 'Đổi ảnh',
   'variant.newImage': 'Ảnh mới',
   'variant.concept': 'Ý tưởng',
+  'variant.tags': 'Thẻ tìm kiếm',
   'variant.log': 'Nhật ký',
   'templateVariant.kindBuild': 'Dựng',
   'templateVariant.kindContract': 'Quy chuẩn',

@@ -95,6 +95,8 @@ export interface Variant {
     name: Named;
     group?: string;
     groupName?: Partial<Named>;
+    /** The words the gallery's search finds the design by (ADR-108 of the app). */
+    tags?: { he: string[]; en: string[] };
     concept?: string;
     art?: string;
     image?: { prompt: string; aspect: string };
