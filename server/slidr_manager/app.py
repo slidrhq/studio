@@ -77,9 +77,10 @@ class PublishItems(BaseModel):
     variantIds: list[str] | None = None
 
 
-class CloudflareSettings(BaseModel):
-    token: str = Field(default="", max_length=400)
-    accountId: str = Field(default="", max_length=64)
+class Publication(BaseModel):
+    """The uploads a publication takes: those named, or every accepted one."""
+
+    uploadIds: list[str] | None = Field(default=None, max_length=50)
 
 
 class LibrarySettings(BaseModel):
@@ -126,15 +127,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         found = await programs.probe()
         return {
             "programs": [p.as_dict() for p in found],
-            "media": {
-                "dir": str(settings.media_dir),
-                "exists": settings.media_dir.is_dir(),
-                "url": settings.media_url,
-            },
-            "cloudflare": {
-                "accountId": settings.cloudflare_account_id,
-                "token": bool(settings.cloudflare_token),
-            },
+            "media": {"url": settings.media_url},
             "library": {"url": settings.library_url, "key": bool(settings.library_key)},
             "renderUrl": settings.render_url,
             "web": settings.web_dist.is_dir(),
@@ -145,7 +138,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return {
             "requests": sorted(store.requests.values(), key=lambda r: r["createdAt"]),
             "variants": list(store.variants.values()),
-            "publish": library.state,
         }
 
     @app.get("/api/library")
@@ -321,40 +313,29 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             settings.library_url = body.url.strip()
         return {"url": settings.library_url, "key": bool(settings.library_key)}
 
-    @app.post("/api/publish/prepare")
-    async def prepare(body: PublishItems) -> dict:
-        vids = body.variantIds
-        if vids is None:
-            vids = [v["id"] for v in store.variants.values() if v.get("approved") and not v.get("discarded")]
+    @app.get("/api/library/accepted")
+    async def accepted() -> dict:
+        """The uploads the library's editors accepted, which the next publication takes."""
         try:
-            await library.prepare(vids)
+            return {"uploads": await library.accepted()}
         except LibraryError as error:
             raise fail(error)
-        return library.state
 
-    @app.post("/api/publish/confirm")
-    async def confirm() -> dict:
+    @app.get("/api/library/state")
+    async def library_state() -> dict:
+        """Where the published library is, when it was published, and how many uploads wait."""
         try:
-            await library.confirm()
+            return await library.state()
         except LibraryError as error:
             raise fail(error)
-        return library.state
 
-    @app.post("/api/publish/cancel")
-    async def cancel_publish() -> dict:
+    @app.post("/api/library/publish")
+    async def publish(body: Publication) -> dict:
+        """Has the library publish its accepted uploads (or those named), through its API."""
         try:
-            await library.cancel()
+            return await library.publish(body.uploadIds)
         except LibraryError as error:
             raise fail(error)
-        return library.state
-
-    @app.post("/api/settings/cloudflare")
-    async def cloudflare(body: CloudflareSettings) -> dict:
-        # Kept in this process's memory only; never written to disk.
-        settings.cloudflare_token = body.token.strip() or None
-        if body.accountId.strip():
-            settings.cloudflare_account_id = body.accountId.strip()
-        return {"accountId": settings.cloudflare_account_id, "token": bool(settings.cloudflare_token)}
 
     # ------------------------------------------------------------------ pages
 

@@ -36,7 +36,6 @@ function hashOf(route: Route): string {
 }
 
 function Programs({ status }: { status?: ServerStatus }) {
-  const t = useT();
   if (!status) return null;
   return (
     <div className="programs">
@@ -49,11 +48,6 @@ function Programs({ status }: { status?: ServerStatus }) {
           {program.ready ? '●' : '○'} {program.name}
         </span>
       ))}
-      {!status.media.exists && (
-        <span className="chip bad" title={status.media.dir}>
-          ○ {t('shell.mediaCopyMissing')}
-        </span>
-      )}
     </div>
   );
 }
@@ -106,7 +100,6 @@ export function Studio() {
     [studio.variants],
   );
   const detail = openVariant ? studio.variants[openVariant] : undefined;
-  const publishBusy = studio.publish.phase === 'preparing' || studio.publish.phase === 'publishing';
 
   return (
     <div className="app">
@@ -126,14 +119,12 @@ export function Studio() {
           <LanguagePicker lang={lang} onChange={setLang} label={t('shell.displayLanguage')} />
           <button
             type="button"
-            className={approved.length || publishBusy ? 'primary' : ''}
+            className={approved.length ? 'primary' : ''}
             onClick={() => setPublishing(true)}
           >
-            {publishBusy
-              ? t('shell.publishing')
-              : approved.length
-                ? t('shell.publishCount', { count: approved.length })
-                : t('shell.publish')}
+            {approved.length
+              ? t('shell.publishCount', { count: approved.length })
+              : t('shell.publish')}
           </button>
         </div>
       </header>

@@ -3,10 +3,8 @@ import type { MessageKey } from '../catalog';
 const words: Record<MessageKey, string> = {
   'shell.subtitle':
     'Design pronti e esempi di modelli per la libreria · Claude, Codex e Cloudflare',
-  'shell.mediaCopyMissing': 'Copia della libreria',
   'shell.disconnected': 'Disconnesso dal server',
   'shell.displayLanguage': "Lingua dell'interfaccia",
-  'shell.publishing': 'Pubblicazione…',
   'shell.publish': 'Pubblica',
   'shell.publishCount': 'Pubblica · {count}',
   'shell.requestsTabs': 'Richieste',
@@ -43,11 +41,6 @@ const words: Record<MessageKey, string> = {
   'shell.effortHigh': 'Alto',
   'shell.effortXhigh': 'Molto alto',
   'shell.effortMax': 'Massimo',
-  'shell.phasePreparing': 'Preparazione della pubblicazione…',
-  'shell.phasePrepared': "Pronto per l'invio — controlla cosa cambierà",
-  'shell.phasePublishing': 'Invio a Cloudflare…',
-  'shell.phaseDone': 'Pubblicato',
-  'shell.phaseFailed': 'Pubblicazione non riuscita',
   'publish.dialogLabel': 'Pubblica',
   'publish.title': 'Pubblica nella libreria multimediale',
   'publish.close': 'Chiudi',
@@ -63,6 +56,19 @@ const words: Record<MessageKey, string> = {
   'publish.waiting': 'In attesa nella libreria come',
   'publish.refused': 'La libreria non l’ha accettato: {error}',
   'publish.openLibrary': 'I caricamenti nella libreria',
+  'publish.libraryTitle': 'Nella libreria',
+  'publish.libraryNote':
+    'Una pubblicazione scrive nella libreria, tramite la sua API, i caricamenti accettati da un redattore: un design nel catalogo dei design con la sua immagine, una traduzione nelle diapositive del suo design, un esempio nel catalogo dei modelli e i tag di ricerca nel file dei tag della loro parte. Ognuno viene controllato ancora una volta rispetto alla libreria, e l’app li trova la prossima volta che legge la libreria.',
+  'publish.publishAccepted': 'Pubblica {count} nella libreria',
+  'publish.publishedResult':
+    '{count} caricamenti pubblicati. La libreria è stata pubblicata il {at}.',
+  'publish.skippedResult': '{count} restano accettati:',
+  'publish.liveState': 'La libreria è stata pubblicata il {at}: {files} file.',
+  'publish.notLive':
+    'La libreria non è ancora nel suo bucket, quindi non vi si può pubblicare nulla. Il README della libreria, sezione "Publishing the uploads", spiega come portarla lì una volta.',
+  'publish.acceptedCount': '{count} caricamenti accettati in attesa',
+  'publish.noAccepted': 'Nessun caricamento accettato in attesa di pubblicazione',
+  'publish.refresh': 'Aggiorna',
   'form.languages': 'Lingue',
   'form.sampleLanguages': "Lingue in cui scrivere l'esempio",
   'form.alreadyWritten': 'già scritto: riscrivi',

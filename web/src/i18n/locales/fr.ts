@@ -3,10 +3,8 @@ import type { MessageKey } from '../catalog';
 const words: Record<MessageKey, string> = {
   'shell.subtitle':
     'Designs prêts à l’emploi et exemples de modèles pour la bibliothèque · Claude, Codex et Cloudflare',
-  'shell.mediaCopyMissing': 'Copie de la bibliothèque',
   'shell.disconnected': 'Déconnecté du serveur',
   'shell.displayLanguage': 'Langue d’affichage',
-  'shell.publishing': 'Publication…',
   'shell.publish': 'Publier',
   'shell.publishCount': 'Publier · {count}',
   'shell.requestsTabs': 'Demandes',
@@ -43,11 +41,6 @@ const words: Record<MessageKey, string> = {
   'shell.effortHigh': 'Élevé',
   'shell.effortXhigh': 'Très élevé',
   'shell.effortMax': 'Maximum',
-  'shell.phasePreparing': 'Préparation de la publication…',
-  'shell.phasePrepared': 'Prêt à envoyer — vérifiez ce qui va changer',
-  'shell.phasePublishing': 'Envoi à Cloudflare…',
-  'shell.phaseDone': 'Publié',
-  'shell.phaseFailed': 'Échec de la publication',
   'publish.dialogLabel': 'Publier',
   'publish.title': 'Publier dans la médiathèque',
   'publish.close': 'Fermer',
@@ -63,6 +56,19 @@ const words: Record<MessageKey, string> = {
   'publish.waiting': 'En attente dans la médiathèque sous',
   'publish.refused': 'La médiathèque ne l’a pas accepté : {error}',
   'publish.openLibrary': 'Les téléversements de la médiathèque',
+  'publish.libraryTitle': 'Vers la médiathèque',
+  'publish.libraryNote':
+    'Une publication écrit dans la bibliothèque, via son API, les téléversements qu’un éditeur a acceptés : un design dans le catalogue des designs avec son image, une traduction dans les diapositives de son design, un exemple dans le catalogue des modèles, et les mots-clés de recherche dans le fichier de mots-clés de leur partie. Chacun est vérifié une fois de plus par rapport à la bibliothèque, et l’app les trouve la prochaine fois qu’elle lit la bibliothèque.',
+  'publish.publishAccepted': 'Publier {count} dans la bibliothèque',
+  'publish.publishedResult':
+    '{count} téléversements publiés. La bibliothèque a été publiée le {at}.',
+  'publish.skippedResult': '{count} restent acceptés :',
+  'publish.liveState': 'La bibliothèque a été publiée le {at} : {files} fichiers.',
+  'publish.notLive':
+    'La bibliothèque n’est pas encore dans son bucket : rien ne peut y être publié. Le README de la bibliothèque, section « Publishing the uploads », explique comment l’y transférer une fois.',
+  'publish.acceptedCount': '{count} téléversements acceptés en attente',
+  'publish.noAccepted': 'Aucun téléversement accepté n’attend d’être publié',
+  'publish.refresh': 'Actualiser',
   'form.languages': 'Langues',
   'form.sampleLanguages': 'Langues dans lesquelles écrire l’exemple',
   'form.alreadyWritten': 'déjà écrit : réécrire',

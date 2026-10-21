@@ -18,7 +18,7 @@ from slidr_manager.app import NewRequest
 from slidr_manager.config import VENDOR, Settings
 from slidr_manager.events import EventBus
 from slidr_manager.instructions import Instructions
-from slidr_manager.library import Library, LibraryError, design_tags, empty_catalog, merge_design, to_webp
+from slidr_manager.library import Library, LibraryError, design_tags, to_webp
 from slidr_manager.pipeline import Studio, StudioError, has_errors, slugify, unique_id, watched
 from slidr_manager.store import Store, write_json
 from slidr_manager.templates import Templates
@@ -119,63 +119,7 @@ def test_codex_pick_prefers_the_named_file(tmp_path: Path):
     assert codex_cli.pick([], "x") is None
 
 
-# ---------------------------------------------------------------- the catalog
-
-
-def design(did: str, group: str, name: str = "N") -> dict:
-    return {
-        "id": did,
-        "name": {"he": name, "en": name},
-        "group": group,
-        "groupName": {"he": group, "en": group},
-        "slides": {"he": {"id": "a"}, "en": {"id": "b"}},
-        "subject": [1, 2],
-        "size": [3, 4],
-    }
-
-
-def test_merge_adds_replaces_and_moves_between_groups():
-    catalog = empty_catalog()
-    merge_design(catalog, design("m-a", "invites"))
-    merge_design(catalog, design("m-b", "invites"))
-    merge_design(catalog, design("m-c", "sales"))
-    assert catalog["groups"] == ["invites", "sales"]
-    assert catalog["groupIds"] == {"invites": ["m-a", "m-b"], "sales": ["m-c"]}
-    # Replaced in place, names and all.
-    merge_design(catalog, design("m-a", "invites", "New"))
-    assert catalog["groupIds"]["invites"] == ["m-a", "m-b"]
-    assert catalog["names"]["m-a"] == {"he": "New", "en": "New"}
-    # A design has one group; a group left empty goes.
-    merge_design(catalog, design("m-c", "invites"))
-    assert catalog["groups"] == ["invites"]
-    assert catalog["groupIds"] == {"invites": ["m-a", "m-b", "m-c"]}
-    assert "sales" not in catalog["groupNames"]
-    assert catalog["sizes"]["m-c"] == [3, 4] and catalog["subjects"]["m-c"] == [1, 2]
-
-
-def test_merge_keeps_the_names_a_group_was_published_with():
-    catalog = empty_catalog()
-    first = design("m-a", "invites")
-    first["groupName"] = {"he": "הזמנות", "en": "Invitations"}
-    merge_design(catalog, first)
-    second = design("m-b", "invites")
-    second["groupName"] = {"he": "אחר", "en": "Other"}
-    merge_design(catalog, second)
-    assert catalog["groupNames"]["invites"] == {"he": "הזמנות", "en": "Invitations"}
-
-
-def test_merge_writes_the_tags_of_a_design_and_drops_them_when_it_has_none():
-    catalog = empty_catalog()
-    tagged = design("m-a", "invites")
-    tagged["tags"] = {"he": ["יום הולדת"], "en": ["birthday"]}
-    merge_design(catalog, tagged)
-    assert catalog["tags"] == {"m-a": {"he": ["יום הולדת"], "en": ["birthday"]}}
-    merge_design(catalog, design("m-a", "invites"))
-    assert catalog["tags"] == {}
-    # A catalog published before there were tags gets the key.
-    old = empty_catalog()
-    del old["tags"]
-    assert "tags" in merge_design(old, design("m-b", "invites"))
+# ---------------------------------------------------------------- the picture
 
 
 def test_webp_keeps_the_size(tmp_path: Path):
@@ -416,10 +360,8 @@ def test_a_request_is_made_in_hebrew_and_english_unless_more_are_chosen():
 # ---------------------------------------------------------------- variants in more languages
 
 
-def _studio(tmp_path: Path, media: Path | None = None) -> tuple[Studio, Store, Library]:
+def _studio(tmp_path: Path) -> tuple[Studio, Store, Library]:
     settings = Settings(data=tmp_path)
-    if media is not None:
-        settings.media_dir = media
     bus = EventBus()
     store = Store(settings.requests_dir, bus)
     templates = Templates(settings)
@@ -463,7 +405,7 @@ def test_a_variant_from_before_the_choice_is_hebrew_and_english(tmp_path: Path):
     assert list(studio.render_input(variant["id"])["html"]) == BASE
 
 
-def test_a_design_is_published_with_a_slide_for_every_language(tmp_path: Path):
+def test_a_design_is_uploaded_with_a_slide_for_every_language(tmp_path: Path):
     _, store, library = _studio(tmp_path)
     request = store.create_request({"prompt": "x", "languages": ["he", "en", "ar", "zh-CN"]})
     variant = store.create_variant(request, 0, dict(BRIEF))
@@ -478,15 +420,12 @@ def test_a_design_is_published_with_a_slide_for_every_language(tmp_path: Path):
     assert record["slides"]["zh-CN"] == {"id": "zh-CN"}
     assert record["name"] == {"he": "שם", "en": "Name"} and record["groupName"] == {"he": "ק", "en": "G"}
     assert record["size"] == [64, 36] and webp[:4] == b"RIFF"
-    catalog = merge_design(empty_catalog(), record)
-    assert set(catalog["slides"]["m-x"]) == {"he", "en", "ar", "zh-CN"}
-    assert catalog["names"]["m-x"] == {"he": "שם", "en": "Name"}
-    # A brief from before there were tags publishes none; one with them, its tags.
-    assert "tags" not in record and catalog["tags"] == {}
+    # A brief from before there were tags has none; one with them, its tags.
+    assert "tags" not in record
     variant["brief"]["tags"] = {"he": ["הזמנה", "מסיבה", "אירוע"], "en": ["Invitation", "party", "event"]}
     record, _ = library._design_record(variant)
     assert record["tags"] == {"he": ["הזמנה", "מסיבה", "אירוע"], "en": ["invitation", "party", "event"]}
-    # Without the English slide it is not published.
+    # Without the English slide it is not uploaded.
     del sides["en"]
     write_json(work / "renders" / "r1" / "result.json", {"publishable": True, "langs": sides, "subject": [5, 6]})
     with pytest.raises(LibraryError):
@@ -557,3 +496,81 @@ def test_the_library_says_why_it_did_not_take_an_upload(monkeypatch):
     assert asyncio.run(api.send({"type": "designs"}))["id"] == "u-1"
     with pytest.raises(uploads.UploadError, match="no key"):
         uploads.LibraryApi("https://library.example/", None)._call("GET", "/api/uploads")
+
+
+# ---------------------------------------------------------------- into the library
+
+
+def test_the_library_is_asked_for_its_state_its_accepted_uploads_and_a_publication(monkeypatch):
+    api = uploads.LibraryApi("https://library.example/", "a-key")
+    pages = {
+        ("GET", "/api/library"): (200, {"live": True, "published": "2026-10-21T00:00:00.000Z", "accepted": 3}),
+        ("GET", "/api/uploads?status=accepted&limit=200"): (200, {"uploads": [{"id": "u-new"}, {"id": "u-mid"}], "next": "u-mid"}),
+        ("GET", "/api/uploads?status=accepted&limit=200&after=u-mid"): (200, {"uploads": [{"id": "u-old"}]}),
+        ("POST", "/api/publish"): (200, {"published": "2026-10-21T00:00:01.000Z", "uploads": [{"id": "u-old"}], "skipped": []}),
+    }
+    sent: list[tuple] = []
+
+    def fetch(method, path, body=None, content_type=None):
+        sent.append((method, path, body, content_type))
+        status, answer = pages.get((method, path), (409, {"error": "not-live", "message": "The library is not in its bucket yet."}))
+        return status, json.dumps(answer).encode("utf-8")
+
+    monkeypatch.setattr(api, "_fetch", fetch)
+    assert asyncio.run(api.library())["accepted"] == 3
+    # Oldest first, across the pages of the listing.
+    assert [u["id"] for u in asyncio.run(api.accepted())] == ["u-old", "u-mid", "u-new"]
+    assert asyncio.run(api.publish(["u-old"]))["uploads"] == [{"id": "u-old"}]
+    assert sent[-1] == ("POST", "/api/publish", b'{"uploads": ["u-old"]}', "application/json")
+    asyncio.run(api.publish())
+    assert sent[-1][2] == b"{}"
+    # What the library refuses is said in its words.
+    pages.pop(("POST", "/api/publish"))
+    with pytest.raises(uploads.UploadError, match="not in its bucket"):
+        asyncio.run(api.publish())
+
+
+def test_a_publication_marks_the_variants_whose_uploads_it_published(tmp_path: Path, monkeypatch):
+    _, store, library = _studio(tmp_path)
+    request = store.create_request({"prompt": "x"})
+    sent = store.create_variant(request, 0, dict(BRIEF))
+    sent["approved"] = True
+    sent["upload"] = {"id": "u-1", "status": "accepted", "at": 1}
+    other = store.create_variant(request, 1, {**BRIEF, "id": "m-y"})
+    other["approved"] = True
+    other["upload"] = {"id": "u-2", "status": "pending", "at": 1}
+    asked: list = []
+
+    class Api:
+        async def publish(self, ids=None):
+            asked.append(ids)
+            return {"published": "2026-10-21T00:00:01.000Z", "uploads": [{"id": "u-1"}], "skipped": [{"id": "u-2", "message": "It is pending."}]}
+
+    monkeypatch.setattr(library, "_api", lambda: Api())
+    done = asyncio.run(library.publish())
+    assert asked == [None] and done["skipped"][0]["id"] == "u-2"
+    # Published, it leaves the queue; the other waits as it was.
+    assert sent["published"]["at"] and sent["approved"] is False and sent["upload"]["status"] == "published"
+    assert "2026-10-21T00:00:01.000Z" in sent["log"][-1]["text"]
+    assert other["approved"] is True and not other.get("published")
+
+
+def test_the_server_says_what_the_library_needs_and_has_no_copy_of_it(tmp_path: Path, monkeypatch):
+    pytest.importorskip("httpx")  # requirements-dev.txt; the test client reads the app through it
+    from fastapi.testclient import TestClient
+
+    from slidr_manager.app import create_app
+
+    settings = Settings(data=tmp_path / "data")
+    assert not hasattr(settings, "media_dir") and not hasattr(settings, "cloudflare_token")
+    app = create_app(settings)
+    with TestClient(app) as client:
+        # Without the library's key, the server says so.
+        for method, path in (("GET", "/api/library/state"), ("GET", "/api/library/accepted"), ("POST", "/api/library/publish")):
+            answer = client.request(method, path, json={} if method == "POST" else None)
+            assert answer.status_code == 400 and "no key" in answer.json()["detail"], path
+        assert client.post("/api/library/publish", json={"uploadIds": ["u"] * 51}).status_code == 422
+        # The copy-based publication is gone.
+        assert client.post("/api/publish/prepare", json={}).status_code in (404, 405)
+        assert "publish" not in client.get("/api/state").json()
+

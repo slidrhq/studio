@@ -53,15 +53,6 @@ export const EFFORTS: { value: string; labelKey: MessageKey }[] = [
   { value: 'max', labelKey: 'shell.effortMax' },
 ];
 
-/** The phase of a publish; `idle` has no label. */
-export const PUBLISH_PHASE: Record<string, MessageKey | undefined> = {
-  preparing: 'shell.phasePreparing',
-  prepared: 'shell.phasePrepared',
-  publishing: 'shell.phasePublishing',
-  done: 'shell.phaseDone',
-  failed: 'shell.phaseFailed',
-};
-
 /** The time of day in the language shown (Hebrew when none is given). */
 export const time = (seconds: number, lang = 'he') =>
   new Date(seconds * 1000).toLocaleTimeString(lang === 'he' ? 'he-IL' : lang, {

@@ -2,8 +2,9 @@
 
 A template request writes the sample deck of one built-in template in languages: one it is not
 written in yet (a translation), or one it has (a rewrite the person describes). Each language is
-a variant of the request, with its own Claude conversation, and each is published by itself into
-`templates/catalog.json`, under `samples[<template>][<lang>]` (docs/media-library.md). A deck in a
+a variant of the request, with its own Claude conversation, and each is uploaded by itself to the
+library, which publishes it into `templates/catalog.json`, under `samples[<template>][<lang>]`
+(docs/media-library.md). A deck in a
 language a sample is written in gets it; any other gets the English one ([ADR-098]).
 
 ```text
@@ -15,8 +16,8 @@ language a sample is written in gets it; any other gets the English one ([ADR-09
 <variant>/work/template.json   the template as the catalog holds it, for the render page
 ```
 
-The catalog read is the author copy's (`../Slidr-media`), which is what publishing sends, and the
-published one when there is no author copy.
+The catalog read is the published one (`SLIDR_MEDIA_URL`), read again after ten minutes, or once
+a publication has changed it.
 """
 
 from __future__ import annotations
@@ -32,7 +33,7 @@ from .instructions import fetch_json
 from .store import write_json
 
 CATALOG = "templates/catalog.json"
-#: How long a published catalog read is kept; the author copy is read again when it changes.
+#: How long the published catalog read is kept.
 PUBLISHED_TTL = 600.0
 
 
@@ -49,49 +50,6 @@ def missing_languages(samples: dict | None) -> list[str]:
     """The content languages a template's sample is not written in yet."""
     have = set(sample_languages(samples))
     return [lang for lang in CONTENT_LANGUAGES if lang not in have]
-
-
-def merge_sample(catalog: dict, template_id: str, lang: str, slides: list) -> dict:
-    """Puts a template's sample in one language into a catalog of templates, replacing the one
-    it had, and keeps the languages of every sample in the registry's order."""
-    if not any(t.get("theme", {}).get("id") == template_id for t in catalog.get("templates") or []):
-        raise TemplateError(f"The catalog has no template {template_id}.")
-    samples = catalog.setdefault("samples", {})
-    mine = dict(samples.get(template_id) or {})
-    mine[lang] = slides
-    samples[template_id] = {code: mine[code] for code in CONTENT_LANGUAGES if code in mine} | {
-        code: value for code, value in mine.items() if code not in CONTENT_LANGUAGES
-    }
-    return catalog
-
-
-def catalog_changes(local: dict, published: dict | None, ours: set[tuple[str, str]]) -> list[str]:
-    """Where a catalog of templates differs from the published one, beside the samples in
-    `ours` ((template, language) pairs): the author's work that is not published yet, which a
-    publication of the file sends too. A part of the catalog, a template, or a sample in a
-    language, as `templates/catalog.json: samples.shidur.de`."""
-    if not isinstance(published, dict):
-        return []
-    out: list[str] = []
-    for key in sorted(set(local) | set(published)):
-        if key == "samples":
-            continue
-        if json.dumps(local.get(key), sort_keys=True) != json.dumps(published.get(key), sort_keys=True):
-            out.append(f"{CATALOG}: {key}")
-    mine, theirs = local.get("samples") or {}, published.get("samples") or {}
-    for tid in sorted(set(mine) | set(theirs)):
-        a, b = mine.get(tid) or {}, theirs.get(tid) or {}
-        for lang in [code for code in CONTENT_LANGUAGES if code in a or code in b]:
-            if (tid, lang) not in ours and a.get(lang) != b.get(lang):
-                out.append(f"{CATALOG}: samples.{tid}.{lang}")
-    return out
-
-
-def encode_catalog(catalog: dict) -> bytes:
-    """The catalog as `export-templates.mjs` writes it (`JSON.stringify(catalog)`: no spaces, no
-    line end), so that publishing changes no byte of it but the sample. Indented, the catalog of
-    sixteen-language samples would pass the 25 MB that Pages serves of a file."""
-    return json.dumps(catalog, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
 # ---------------------------------------------------------------------- what Claude reads
@@ -207,34 +165,23 @@ class Templates:
 
     def __init__(self, settings: Settings) -> None:
         self.settings = settings
-        self._read: tuple[Any, dict] | None = None
+        self._read: tuple[float, dict] | None = None
         self._lock = asyncio.Lock()
 
-    @property
-    def local(self) -> Path:
-        return self.settings.media_dir / Path(*CATALOG.split("/"))
-
     async def catalog(self) -> dict:
-        """The author copy's catalog when there is one, else the published one."""
+        """The published catalog of templates."""
         async with self._lock:
             loop = asyncio.get_running_loop()
-            if self.local.is_file():
-                key: Any = ("local", self.local.stat().st_mtime_ns)
-                if self._read and self._read[0] == key:
-                    return self._read[1]
-                data = await asyncio.to_thread(lambda: json.loads(self.local.read_text(encoding="utf-8")))
-            else:
-                if self._read and self._read[0][0] == "published" and loop.time() - self._read[0][1] < PUBLISHED_TTL:
-                    return self._read[1]
-                url = self.settings.media_url.rstrip("/") + "/" + CATALOG
-                try:
-                    data = await asyncio.to_thread(fetch_json, url, 120)
-                except Exception as error:  # noqa: BLE001 - any failure means no catalog
-                    raise TemplateError(f"Could not read the library's templates ({url}): {error}")
-                key = ("published", loop.time())
+            if self._read and loop.time() - self._read[0] < PUBLISHED_TTL:
+                return self._read[1]
+            url = self.settings.media_url.rstrip("/") + "/" + CATALOG
+            try:
+                data = await asyncio.to_thread(fetch_json, url, 120)
+            except Exception as error:  # noqa: BLE001 - any failure means no catalog
+                raise TemplateError(f"Could not read the library's templates ({url}): {error}")
             if not isinstance(data, dict) or not isinstance(data.get("templates"), list):
                 raise TemplateError("The catalog of templates holds no templates.")
-            self._read = (key, data)
+            self._read = (loop.time(), data)
             return data
 
     def forget(self) -> None:

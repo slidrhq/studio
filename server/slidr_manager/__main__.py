@@ -29,7 +29,7 @@ def main() -> None:
     config = uvicorn.Config(app, host=settings.host, port=settings.port, log_level="warning")
     server = uvicorn.Server(config)
     url = f"http://{settings.host}:{settings.port}/"
-    print(f"Slidr Studio: {url}  (data: {settings.data}, library copy: {settings.media_dir})")
+    print(f"Slidr Studio: {url}  (data: {settings.data}, library: {settings.library_url})")
     if not args.no_open:
         webbrowser.open(url)
     # The default loop of Windows (Proactor) is the one that runs subprocesses.

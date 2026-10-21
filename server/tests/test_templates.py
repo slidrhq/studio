@@ -13,7 +13,7 @@ from slidr_manager.app import NewRequest
 from slidr_manager.config import Settings
 from slidr_manager.events import EventBus
 from slidr_manager.instructions import Instructions
-from slidr_manager.library import Library, LibraryError
+from slidr_manager.library import Library
 from slidr_manager.pipeline import Studio, StudioError, watched
 from slidr_manager.store import Store, write_json
 from slidr_manager.templates import Templates
@@ -97,7 +97,8 @@ def _studio(tmp_path: Path, catalog: dict | None = None) -> tuple[Studio, Store,
     media = tmp_path / "media"
     write_json(media / "templates" / "catalog.json", catalog or _catalog())
     settings = Settings(data=tmp_path / "data")
-    settings.media_dir = media
+    # The published library, as a site of files: the studio reads it, and keeps no copy of it.
+    settings.media_url = media.as_uri() + "/"
     bus = EventBus()
     store = Store(settings.requests_dir, bus)
     shelf = Templates(settings)
@@ -149,20 +150,6 @@ def test_the_languages_a_template_lacks_are_the_registrys_others():
     missing = templates.missing_languages({"he": [], "en": []})
     assert missing == [code for code in languages.CONTENT_LANGUAGES if code not in BASE]
     assert len(missing) == 14
-
-
-def test_a_sample_is_merged_in_the_registrys_order_and_written_as_node_writes_it():
-    catalog = _catalog()
-    templates.merge_sample(catalog, "mifgash", "ja", [{"layout": "l_cards"}])
-    templates.merge_sample(catalog, "mifgash", "de", [{"layout": "l_cards"}])
-    assert list(catalog["samples"]["mifgash"]) == ["he", "en", "de", "ja"]
-    templates.merge_sample(catalog, "mifgash", "de", [{"layout": "l_cards", "name": "Drei"}])
-    assert catalog["samples"]["mifgash"]["de"] == [{"layout": "l_cards", "name": "Drei"}]
-    with pytest.raises(templates.TemplateError):
-        templates.merge_sample(catalog, "nosuch", "de", [])
-    # `JSON.stringify(…)`: no spaces and no line end, letters as they are.
-    encoded = templates.encode_catalog({"a": [1, {"b": "שלום"}]})
-    assert encoded == '{"a":[1,{"b":"שלום"}]}'.encode("utf-8")
 
 
 def test_the_listing_names_each_template_in_the_apps_words(tmp_path: Path):
@@ -252,40 +239,6 @@ def test_a_rewrite_starts_from_the_sample_the_template_has(tmp_path: Path):
     assert "Rewrite it as the person asks" in template_prompts.build_prompt(variant["brief"])
 
 
-# ---------------------------------------------------------------- publishing
-
-
-def test_an_approved_sample_is_published_into_the_author_copys_catalog(tmp_path: Path, monkeypatch):
-    _, store, library, media = _studio(tmp_path)
-    # The published catalog: the author copy's, before the author added a German sample.
-    published = _catalog()
-
-    async def published_json(path: str):
-        return published if path == templates.CATALOG else None
-
-    monkeypatch.setattr(library, "published_json", published_json)
-    catalog = _catalog()
-    catalog["samples"]["mifgash"]["de"] = EN
-    write_json(media / "templates" / "catalog.json", catalog)
-    variant = _variant(store, "ar")
-    work = store.work_dir(variant)
-    variant["render"] = {"revision": 2}
-    write_json(work / "renders" / "r2" / "result.json", {"publishable": False, "sample": EN})
-    with pytest.raises(LibraryError, match="did not pass"):
-        asyncio.run(library._prepare_samples([variant]))
-    write_json(work / "renders" / "r2" / "result.json", {"publishable": True, "sample": HE})
-    # The author's German sample, not published yet, goes with the file: the report says so.
-    others = asyncio.run(library._prepare_samples([variant]))
-    assert others == ["templates/catalog.json: samples.mifgash.de"]
-    catalog = media / "templates" / "catalog.json"
-    written = json.loads(catalog.read_text(encoding="utf-8"))
-    assert list(written["samples"]["mifgash"]) == ["he", "en", "ar", "de"]
-    assert written["samples"]["mifgash"]["ar"] == HE and written["samples"]["mifgash"]["de"] == EN
-    # Cancelling puts the author copy back as it was.
-    library._revert()
-    assert "ar" not in json.loads(catalog.read_text(encoding="utf-8"))["samples"]["mifgash"]
-
-
 def test_findings_the_source_slide_has_are_told_apart():
     result = {
         "lang": "de",
@@ -308,17 +261,3 @@ def test_findings_the_source_slide_has_are_told_apart():
     text = template_prompts.slide_findings(result)
     assert '- s03 "In Zahlen" (l_big) · error · L01: Text overflows.' in text
     assert "not this language's to fix: L09, L13" in text and "Misaligned" not in text
-
-
-def test_the_catalogs_unpublished_work_is_listed_beside_ours():
-    published = _catalog()
-    local = _catalog()
-    local["samples"]["mifgash"]["ar"] = HE
-    local["samples"]["mifgash"]["ja"] = EN
-    local["pictures"] = {"x": {"id": "1"}}
-    ours = {("mifgash", "ar")}
-    assert templates.catalog_changes(local, published, ours) == [
-        "templates/catalog.json: pictures",
-        "templates/catalog.json: samples.mifgash.ja",
-    ]
-    assert templates.catalog_changes(local, None, ours) == []

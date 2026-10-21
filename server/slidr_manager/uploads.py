@@ -1,7 +1,8 @@
 """Uploads to Slidr Library ([slidrhq/library](https://github.com/slidrhq/library), README
 "Uploading"): the studio sends its approved work to the library's REST API, which checks it
-against the published library and keeps it until an editor accepts it. A publication takes the
-accepted uploads into the library from there; the studio does not publish the author copy for them.
+against the published library and keeps it until an editor accepts it. The studio's publication
+then takes the accepted uploads into the library, by the library's API too (`POST /api/publish`): the
+library lives in its Worker's bucket, and nothing of it is copied here.
 
 A design goes as `designs: add`, with its picture, its slide in each language it was made in, and
 its names and search tags in Hebrew and English (ADR-108 of the app); a template's sample as
@@ -88,7 +89,8 @@ class LibraryApi:
         self.url = url.rstrip("/")
         self.key = key
 
-    def _call(self, method: str, path: str, body: bytes | None = None, content_type: str | None = None) -> tuple[int, Any]:
+    def _fetch(self, method: str, path: str, body: bytes | None = None, content_type: str | None = None) -> tuple[int, bytes]:
+        """A request to the API, with the studio's key: the status and the bytes of the answer."""
         if not self.key:
             raise UploadError("The studio has no key to the library: set SLIDR_LIBRARY_KEY, or give it in the Publish panel.")
         headers = {"Authorization": f"Bearer {self.key}", "Accept": "application/json"}
@@ -97,15 +99,27 @@ class LibraryApi:
         request = urllib.request.Request(self.url + path, data=body, method=method, headers=headers)
         try:
             with urllib.request.urlopen(request, timeout=TIMEOUT_S) as answer:
-                status, data = answer.status, answer.read()
+                return answer.status, answer.read()
         except urllib.error.HTTPError as error:
-            status, data = error.code, error.read()
+            return error.code, error.read()
         except (urllib.error.URLError, OSError) as error:
             raise UploadError(f"{self.url} could not be reached: {error}") from error
+
+    def _call(self, method: str, path: str, body: bytes | None = None, content_type: str | None = None) -> tuple[int, Any]:
+        """A request whose answer is JSON: the status, and the answer (None when it is not JSON)."""
+        status, data = self._fetch(method, path, body, content_type)
         try:
             return status, json.loads(data.decode("utf-8")) if data else None
         except ValueError:
             return status, None
+
+    @staticmethod
+    def _refused(status: int, answer: Any, doing: str) -> UploadError:
+        answer = answer if isinstance(answer, dict) else {}
+        return UploadError(
+            answer.get("message") or f"The library answered {status} to {doing}.",
+            [issue for issue in answer.get("issues") or [] if isinstance(issue, dict)],
+        )
 
     async def send(self, upload: dict, files: dict[str, tuple[bytes, str]] | None = None) -> dict:
         """Sends an upload; the upload as the library keeps it, or `UploadError` with what is wrong."""
@@ -113,8 +127,40 @@ class LibraryApi:
         status, answer = await asyncio.to_thread(self._call, "POST", "/api/uploads", body, content_type)
         if status == 201 and isinstance(answer, dict):
             return answer
-        answer = answer if isinstance(answer, dict) else {}
-        raise UploadError(
-            answer.get("message") or f"The library answered {status}.",
-            [issue for issue in answer.get("issues") or [] if isinstance(issue, dict)],
+        raise self._refused(status, answer, "the upload")
+
+    async def accepted(self) -> list[dict]:
+        """The uploads an editor accepted, which a publication takes: oldest first, so that of
+        two that touch the same thing the later one is written last."""
+        found: list[dict] = []
+        after: str | None = None
+        while True:
+            path = "/api/uploads?status=accepted&limit=200" + (f"&after={after}" if after else "")
+            status, answer = await asyncio.to_thread(self._call, "GET", path)
+            if status != 200 or not isinstance(answer, dict):
+                raise self._refused(status, answer, "listing the accepted uploads")
+            found.extend(upload for upload in answer.get("uploads") or [] if isinstance(upload, dict))
+            after = answer.get("next")
+            if not after or not isinstance(after, str):
+                break
+        found.reverse()
+        return found
+
+    async def library(self) -> dict:
+        """Where the published library is, when it was published, and how many uploads wait
+        (`GET /api/library`)."""
+        status, answer = await asyncio.to_thread(self._call, "GET", "/api/library")
+        if status != 200 or not isinstance(answer, dict):
+            raise self._refused(status, answer, "reading the library's state")
+        return answer
+
+    async def publish(self, upload_ids: list[str] | None = None) -> dict:
+        """Writes the accepted uploads (or those named) into the library (`POST /api/publish`):
+        the uploads published and the files each wrote, those left accepted and why."""
+        body = json.dumps({"uploads": upload_ids} if upload_ids else {}).encode("utf-8")
+        status, answer = await asyncio.to_thread(
+            self._call, "POST", "/api/publish", body, "application/json"
         )
+        if status != 200 or not isinstance(answer, dict):
+            raise self._refused(status, answer, "the publication")
+        return answer

@@ -3,10 +3,8 @@ import type { MessageKey } from '../catalog';
 const words: Record<MessageKey, string> = {
   'shell.subtitle':
     'Fertige Designs und Vorlagenbeispiele für die Bibliothek · Claude, Codex und Cloudflare',
-  'shell.mediaCopyMissing': 'Bibliothekskopie',
   'shell.disconnected': 'Verbindung zum Server getrennt',
   'shell.displayLanguage': 'Anzeigesprache',
-  'shell.publishing': 'Wird veröffentlicht…',
   'shell.publish': 'Veröffentlichen',
   'shell.publishCount': 'Veröffentlichen · {count}',
   'shell.requestsTabs': 'Anfragen',
@@ -43,11 +41,6 @@ const words: Record<MessageKey, string> = {
   'shell.effortHigh': 'Hoch',
   'shell.effortXhigh': 'Sehr hoch',
   'shell.effortMax': 'Maximal',
-  'shell.phasePreparing': 'Veröffentlichung wird vorbereitet…',
-  'shell.phasePrepared': 'Bereit zum Senden – prüfen Sie die Änderungen',
-  'shell.phasePublishing': 'Wird an Cloudflare gesendet…',
-  'shell.phaseDone': 'Veröffentlicht',
-  'shell.phaseFailed': 'Veröffentlichung fehlgeschlagen',
   'publish.dialogLabel': 'Veröffentlichen',
   'publish.title': 'In der Medienbibliothek veröffentlichen',
   'publish.close': 'Schließen',
@@ -63,6 +56,19 @@ const words: Record<MessageKey, string> = {
   'publish.waiting': 'Wartet in der Bibliothek als',
   'publish.refused': 'Die Bibliothek hat es nicht angenommen: {error}',
   'publish.openLibrary': 'Die Uploads in der Bibliothek',
+  'publish.libraryTitle': 'In die Bibliothek',
+  'publish.libraryNote':
+    'Eine Veröffentlichung schreibt die Uploads, die ein Redakteur angenommen hat, über die API der Bibliothek in die Bibliothek: ein Design mit seinem Bild in den Design-Katalog, eine Übersetzung in die Folien ihres Designs, ein Beispiel in den Vorlagen-Katalog und Suchbegriffe in die Tag-Datei ihres Teils. Jeder Upload wird noch einmal gegen die Bibliothek geprüft, und die App findet ihn, sobald sie die Bibliothek das nächste Mal liest.',
+  'publish.publishAccepted': '{count} in der Bibliothek veröffentlichen',
+  'publish.publishedResult':
+    '{count} Uploads veröffentlicht. Die Bibliothek wurde am {at} veröffentlicht.',
+  'publish.skippedResult': '{count} bleiben angenommen:',
+  'publish.liveState': 'Die Bibliothek wurde am {at} veröffentlicht: {files} Dateien.',
+  'publish.notLive':
+    'Die Bibliothek ist noch nicht in ihrem Bucket, daher kann nichts in ihr veröffentlicht werden. Die README der Bibliothek, Abschnitt "Publishing the uploads", erklärt, wie sie einmalig dorthin gelangt.',
+  'publish.acceptedCount': '{count} angenommene Uploads warten',
+  'publish.noAccepted': 'Keine angenommenen Uploads warten auf die Veröffentlichung',
+  'publish.refresh': 'Aktualisieren',
   'form.languages': 'Sprachen',
   'form.sampleLanguages': 'Sprachen für das Beispiel',
   'form.alreadyWritten': 'schon geschrieben: neu schreiben',
