@@ -17,7 +17,7 @@ WEB = STUDIO / "web"
 #: The app's code the studio uses, at its paths in the app's repository (vendor/README.md).
 VENDOR = STUDIO / "vendor"
 
-DEFAULT_MEDIA_URL = "https://slidr-media.pages.dev/"
+DEFAULT_MEDIA_URL = "https://media.slidr.studio/"
 #: Slidr Library, whose upload API takes the studio's work (`uploads.py`).
 DEFAULT_LIBRARY_URL = "https://library.slidr.workers.dev/"
 

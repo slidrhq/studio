@@ -88,7 +88,7 @@ The "Library" tab opens [Slidr Library](https://github.com/slidrhq/library) (`VI
 | ------------------------------------------------------ | ------------------------------------------ |
 | `SLIDR_STUDIO_PORT`, `SLIDR_STUDIO_HOST`               | `8765`, `127.0.0.1`                        |
 | `SLIDR_STUDIO_DATA`                                    | `.data`                                    |
-| `SLIDR_MEDIA_URL`                                      | `https://slidr-media.pages.dev/`           |
+| `SLIDR_MEDIA_URL`                                      | `https://media.slidr.studio/`              |
 | `SLIDR_LIBRARY_URL`, `SLIDR_LIBRARY_KEY`               | `https://library.slidr.workers.dev/`, none |
 | `SLIDR_STUDIO_MAX_CLAUDE`, `_MAX_CODEX`, `_MAX_RENDER` | `4`, `4`, `2`                              |
 | `SLIDR_STUDIO_BROWSER`                                 | `msedge` (a Playwright channel)            |

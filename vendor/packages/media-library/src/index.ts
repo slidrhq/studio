@@ -3,9 +3,9 @@
  * built-in templates and their photographs, and the content of Elements. It is a site of its own,
  * published apart from the app and read while the app runs:
  *
- *   https://slidr-media.pages.dev/manifest.json        every file of the library, its size and hash
- *   https://slidr-media.pages.dev/fonts/catalog.json
- *   https://slidr-media.pages.dev/images/templates/shvil-ridge.webp
+ *   https://media.slidr.studio/manifest.json        every file of the library, its size and hash
+ *   https://media.slidr.studio/fonts/catalog.json
+ *   https://media.slidr.studio/images/templates/shvil-ridge.webp
  *
  * Where a page reads it from:
  * - in the app, through the core's `media` protocol, which keeps the library on the machine and
@@ -23,7 +23,7 @@
  */
 
 /** Where the library is published. */
-export const MEDIA_LIBRARY_URL = 'https://slidr-media.pages.dev/';
+export const MEDIA_LIBRARY_URL = 'https://media.slidr.studio/';
 
 /** The path a dev server serves the library at, defined by its plugin; absent elsewhere. */
 declare const __SLIDR_MEDIA_PATH__: string | undefined;
