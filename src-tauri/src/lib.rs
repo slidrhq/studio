@@ -154,7 +154,7 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         Some(repository) => repository.join(".data"),
         None => app.path().app_local_data_dir()?,
     };
-    let settings = Arc::new(Settings::new(data, secrets::library_key()));
+    let settings = Arc::new(Settings::new(data, secrets::library_token()));
     let emitter = app.clone();
     let emit: Emit = Arc::new(move |event| {
         let _ = emitter.emit_to("main", "studio", event);

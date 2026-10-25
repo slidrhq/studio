@@ -49,9 +49,9 @@ const words: Record<MessageKey, string> = {
   'publish.save': 'Salva',
   'publish.uploadNote':
     'Ogni design approvato va all’API di caricamento della libreria come nuovo design, con le sue slide, i suoi nomi e i suoi tag di ricerca; ogni esempio come il suo modello in un’altra lingua. La libreria lo verifica rispetto a ciò che pubblica e lo tiene finché un editor non lo accetta; da lì viene pubblicato.',
-  'publish.keyTitle': 'La chiave della libreria',
-  'publish.keyHelp':
-    'La chiave dello studio per l’API della libreria: studio=<key> in LIBRARY_KEYS del suo Worker. Tenuta nel Gestore credenziali di Windows di questo computer.',
+  'publish.tokenTitle': 'Il token della libreria',
+  'publish.tokenHelp':
+    'Un token dal profilo della libreria, con il permesso «Caricare e pubblicare», che un amministratore della libreria crea lì. Tenuto nel Gestore credenziali di Windows di questo computer.',
   'publish.upload': 'Invia {count} alla libreria',
   'publish.waiting': 'In attesa nella libreria come',
   'publish.refused': 'La libreria non l’ha accettato: {error}',

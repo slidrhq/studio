@@ -42,7 +42,7 @@ pub async fn studio_status(studio: State<'_, Arc<Studio>>) -> Answer {
     Ok(json!({
         "programs": found,
         "media": {"url": studio.settings.media_url},
-        "library": {"url": remote.library_url, "key": remote.library_key.is_some()},
+        "library": {"url": remote.library_url, "token": remote.library_token.is_some()},
     }))
 }
 
@@ -288,32 +288,46 @@ fn approved(studio: &Studio) -> Vec<String> {
         .collect()
 }
 
-/// The library's address, and the studio's key to it, kept in the system's credential store.
+/// The library's address, and the studio's token to it, kept in the system's credential store.
 #[tauri::command]
 pub fn library_settings(
     studio: State<'_, Arc<Studio>>,
-    key: Option<String>,
+    token: Option<String>,
     url: Option<String>,
 ) -> Answer {
-    let key = key
-        .map(|key| key.trim().to_owned())
-        .filter(|key| !key.is_empty());
+    let token = token
+        .map(|token| token.trim().to_owned())
+        .filter(|token| !token.is_empty());
     let url = url
         .map(|url| url.trim().to_owned())
         .filter(|url| !url.is_empty());
-    if let Some(key) = &key {
-        too_long(key, 400, "key")?;
-        secrets::set_library_key(key)?;
+    if let Some(token) = &token {
+        too_long(token, 400, "token")?;
+        if !is_token(token) {
+            return Err(
+                "This is not a token of the library: make one in its profile (slk_…).".into(),
+            );
+        }
+        secrets::set_library_token(token)?;
     }
     let mut remote = studio.settings.remote();
-    if let Some(key) = key {
-        remote.library_key = Some(key);
+    if let Some(token) = token {
+        remote.library_token = Some(token);
     }
     if let Some(url) = url {
         too_long(&url, 400, "address")?;
         remote.library_url = url;
     }
-    Ok(json!({"url": remote.library_url, "key": remote.library_key.is_some()}))
+    Ok(json!({"url": remote.library_url, "token": remote.library_token.is_some()}))
+}
+
+/// Whether a text is a token of the library: `slk_` and 43 characters of base64url.
+fn is_token(text: &str) -> bool {
+    text.len() == 47
+        && text.starts_with("slk_")
+        && text[4..]
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
 
 /// Where the published library is, when it was published, and how many uploads wait for it.

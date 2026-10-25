@@ -181,8 +181,8 @@ export interface ServerStatus {
   programs: ProgramStatus[];
   /** Where the library is published, which the studio reads. */
   media: { url: string };
-  /** Slidr Library, whose upload API takes the approved work, and whether the studio has its key. */
-  library: { url: string; key: boolean };
+  /** Slidr Library, whose upload API takes the approved work, and whether the studio has a token. */
+  library: { url: string; token: boolean };
 }
 
 /** What became of one approved item sent to the library's upload API. */
@@ -338,8 +338,8 @@ export const api = {
     call<Publication>('library_publish', { uploadIds: uploadIds ?? null }),
   upload: (variantIds?: string[]) =>
     call<{ items: UploadItem[] }>('library_upload', { variantIds: variantIds ?? null }),
-  librarySettings: (key: string, url = '') =>
-    call<{ url: string; key: boolean }>('library_settings', { key, url }),
+  librarySettings: (token: string, url = '') =>
+    call<{ url: string; token: boolean }>('library_settings', { token, url }),
 };
 
 /** A file of a variant's working folder, through the studio's `studio:` protocol. */

@@ -49,9 +49,9 @@ const words: Record<MessageKey, string> = {
   'publish.save': '保存',
   'publish.uploadNote':
     '承認された各デザインは、スライド・名前・検索タグとともに新しいデザインとしてメディアライブラリのアップロード API に送られます。各サンプルは、そのテンプレートの別言語版として送られます。ライブラリは公開中の内容と照らし合わせて確認し、編集者が承認するまで保管します。公開はそこから行われます。',
-  'publish.keyTitle': 'メディアライブラリのキー',
-  'publish.keyHelp':
-    'メディアライブラリの API に対するスタジオのキー：Worker の LIBRARY_KEYS にある studio=<key>。このコンピューターの Windows 資格情報マネージャーに保存されます。',
+  'publish.tokenTitle': 'メディアライブラリのトークン',
+  'publish.tokenHelp':
+    'メディアライブラリの管理者がプロフィールで作成する、「アップロードと公開」権限のトークン。このコンピューターの Windows 資格情報マネージャーに保存されます。',
   'publish.upload': '{count} 件をメディアライブラリに送る',
   'publish.waiting': 'メディアライブラリで待機中：',
   'publish.refused': 'メディアライブラリに受け付けられませんでした：{error}',

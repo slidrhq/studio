@@ -48,9 +48,9 @@ const words: Record<MessageKey, string> = {
   'publish.save': 'Lưu',
   'publish.uploadNote':
     'Mỗi thiết kế đã duyệt được gửi tới API tải lên của thư viện như một thiết kế mới, kèm các slide, tên và thẻ tìm kiếm; mỗi mẫu được gửi như mẫu của nó bằng một ngôn ngữ khác. Thư viện kiểm tra nó với những gì đang xuất bản và giữ lại cho tới khi một biên tập viên chấp nhận; việc xuất bản diễn ra từ đó.',
-  'publish.keyTitle': 'Khóa của thư viện',
-  'publish.keyHelp':
-    'Khóa của studio cho API của thư viện: studio=<key> trong LIBRARY_KEYS của Worker. Được giữ trong Trình quản lý thông tin xác thực của Windows trên máy tính này.',
+  'publish.tokenTitle': 'Token của thư viện',
+  'publish.tokenHelp':
+    'Token từ hồ sơ trong thư viện, với quyền "Tải lên và xuất bản", do quản trị viên của thư viện tạo ở đó. Được giữ trong Trình quản lý thông tin xác thực của Windows trên máy tính này.',
   'publish.upload': 'Gửi {count} tới thư viện',
   'publish.waiting': 'Đang chờ trong thư viện với mã',
   'publish.refused': 'Thư viện không nhận: {error}',

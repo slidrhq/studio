@@ -49,9 +49,9 @@ const words: Record<MessageKey, string> = {
   'publish.save': 'Guardar',
   'publish.uploadNote':
     'Cada diseño aprobado va a la API de subidas de la biblioteca como un diseño nuevo, con sus diapositivas, sus nombres y sus etiquetas de búsqueda; cada muestra, como su plantilla en otro idioma. La biblioteca lo comprueba con lo que publica y lo guarda hasta que un editor lo acepta; desde ahí se publica.',
-  'publish.keyTitle': 'La clave de la biblioteca',
-  'publish.keyHelp':
-    'La clave del estudio para la API de la biblioteca: studio=<key> en LIBRARY_KEYS de su Worker. Se guarda en el Administrador de credenciales de Windows de este equipo.',
+  'publish.tokenTitle': 'El token de la biblioteca',
+  'publish.tokenHelp':
+    'Un token del perfil de la biblioteca, con el permiso «Subir y publicar», que crea allí un administrador de la biblioteca. Se guarda en el Administrador de credenciales de Windows de este equipo.',
   'publish.upload': 'Enviar {count} a la biblioteca',
   'publish.waiting': 'Espera en la biblioteca como',
   'publish.refused': 'La biblioteca no lo aceptó: {error}',

@@ -51,8 +51,9 @@ fn number(name: &str, default: usize) -> usize {
 pub struct Remote {
     /// The library whose API the approved work is uploaded to.
     pub library_url: String,
-    /// The studio's key to it (the Worker's `LIBRARY_KEYS`, `studio=<key>`).
-    pub library_key: Option<String>,
+    /// The studio's token to it: a person's (`slk_…`), of the `publish` scope, which an admin
+    /// makes in the library's profile.
+    pub library_token: Option<String>,
 }
 
 pub struct Settings {
@@ -75,7 +76,7 @@ pub struct Settings {
 
 impl Settings {
     /// The settings of the environment, over `data` where it names none.
-    pub fn new(data: PathBuf, library_key: Option<String>) -> Self {
+    pub fn new(data: PathBuf, library_token: Option<String>) -> Self {
         Self {
             data: path("SLIDR_STUDIO_DATA").unwrap_or(data),
             media_url: text("SLIDR_MEDIA_URL").unwrap_or_else(|| DEFAULT_MEDIA_URL.into()),
@@ -90,7 +91,7 @@ impl Settings {
             remote: Mutex::new(Remote {
                 library_url: text("SLIDR_LIBRARY_URL")
                     .unwrap_or_else(|| DEFAULT_LIBRARY_URL.into()),
-                library_key: text("SLIDR_LIBRARY_KEY").or(library_key),
+                library_token: text("SLIDR_LIBRARY_TOKEN").or(library_token),
             }),
         }
     }

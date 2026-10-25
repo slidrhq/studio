@@ -49,9 +49,9 @@ const words: Record<MessageKey, string> = {
   'publish.save': 'Kaydet',
   'publish.uploadNote':
     "Onaylanan her tasarım, slaytları, adları ve arama etiketleriyle birlikte yeni bir tasarım olarak kütüphanenin yükleme API'sine gider; her örnek, şablonunun başka bir dildeki hâli olarak. Kütüphane onu yayınladıklarıyla karşılaştırarak denetler ve bir editör kabul edene kadar saklar; yayın oradan yapılır.",
-  'publish.keyTitle': 'Kütüphanenin anahtarı',
-  'publish.keyHelp':
-    "Stüdyonun kütüphane API'sine anahtarı: Worker'ının LIBRARY_KEYS değerindeki studio=<key>. Bu bilgisayarın Windows Kimlik Bilgileri Yöneticisi'nde tutulur.",
+  'publish.tokenTitle': 'Kütüphanenin belirteci',
+  'publish.tokenHelp':
+    'Kütüphanedeki profilden, bir kütüphane yöneticisinin orada oluşturduğu "Yükleme ve yayımlama" izinli bir belirteç. Bu bilgisayarın Windows Kimlik Bilgileri Yöneticisi\'nde tutulur.',
   'publish.upload': '{count} öğeyi kütüphaneye gönder',
   'publish.waiting': 'Kütüphanede şu adla bekliyor:',
   'publish.refused': 'Kütüphane kabul etmedi: {error}',

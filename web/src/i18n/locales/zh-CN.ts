@@ -48,9 +48,9 @@ const words: Record<MessageKey, string> = {
   'publish.save': '保存',
   'publish.uploadNote':
     '每个已批准的设计都会作为新设计发送到媒体库的上传 API，附带其幻灯片、名称和搜索标签；每个示例则作为其模板的另一种语言版本发送。媒体库会对照其已发布的内容进行检查，并保留到编辑接受为止；之后从那里发布。',
-  'publish.keyTitle': '媒体库的密钥',
-  'publish.keyHelp':
-    '工作室访问媒体库 API 的密钥：其 Worker 的 LIBRARY_KEYS 中的 studio=<key>。保存在此电脑的 Windows 凭据管理器中。',
+  'publish.tokenTitle': '媒体库的令牌',
+  'publish.tokenHelp':
+    '由媒体库的管理员在个人资料中创建的令牌，权限为“上传和发布”。保存在此电脑的 Windows 凭据管理器中。',
   'publish.upload': '将 {count} 项发送到媒体库',
   'publish.waiting': '在媒体库中等待，编号',
   'publish.refused': '媒体库未接受：{error}',

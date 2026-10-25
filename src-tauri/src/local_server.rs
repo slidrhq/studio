@@ -84,7 +84,7 @@ async fn status(State(shared): State<Shared>) -> Json<Value> {
     let remote = settings.remote().clone();
     Json(json!({
         "media": {"url": settings.media_url},
-        "library": {"url": remote.library_url, "key": remote.library_key.is_some()},
+        "library": {"url": remote.library_url, "token": remote.library_token.is_some()},
     }))
 }
 

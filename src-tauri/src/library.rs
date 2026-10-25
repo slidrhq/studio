@@ -167,12 +167,12 @@ impl Library {
         }
     }
 
-    /// The library's API, at its address, with the studio's key as it is now.
+    /// The library's API, at its address, with the studio's token as it is now.
     fn api(&self) -> LibraryApi {
         let remote = self.settings.remote();
         LibraryApi::with(
             &remote.library_url,
-            remote.library_key.clone(),
+            remote.library_token.clone(),
             Arc::clone(&self.transport),
         )
     }
@@ -651,11 +651,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn without_its_key_the_studio_says_so() {
+    async fn without_its_token_the_studio_says_so() {
         let dir = tempfile::tempdir().expect("a folder");
         let settings = Arc::new(Settings::new(dir.path().to_path_buf(), None));
-        if settings.remote().library_key.is_some() {
-            // SLIDR_LIBRARY_KEY is set where the tests run.
+        if settings.remote().library_token.is_some() {
+            // SLIDR_LIBRARY_TOKEN is set where the tests run.
             return;
         }
         let store = Arc::new(store(&settings.requests_dir()));
@@ -666,7 +666,7 @@ mod tests {
             library.accepted().await.err(),
             library.publish(None).await.err(),
         ] {
-            assert!(refused.is_some_and(|e| e.contains("no key")));
+            assert!(refused.is_some_and(|e| e.contains("no token")));
         }
     }
 }

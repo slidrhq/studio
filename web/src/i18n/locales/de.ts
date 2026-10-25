@@ -49,9 +49,9 @@ const words: Record<MessageKey, string> = {
   'publish.save': 'Speichern',
   'publish.uploadNote':
     'Jedes freigegebene Design geht als neues Design an die Upload-API der Bibliothek, mit seinen Folien, Namen und Suchbegriffen; jedes Beispiel als seine Vorlage in einer weiteren Sprache. Die Bibliothek prüft es gegen das, was sie veröffentlicht, und hält es zurück, bis es jemand aus der Redaktion annimmt; von dort wird es veröffentlicht.',
-  'publish.keyTitle': 'Schlüssel der Bibliothek',
-  'publish.keyHelp':
-    'Der Schlüssel des Studios zur API der Bibliothek: studio=<key> in LIBRARY_KEYS ihres Workers. Wird in der Windows-Anmeldeinformationsverwaltung dieses Computers gespeichert.',
+  'publish.tokenTitle': 'Token der Bibliothek',
+  'publish.tokenHelp':
+    'Ein Token aus dem Profil der Bibliothek mit dem Recht „Hochladen und veröffentlichen“, das ein Admin der Bibliothek dort erstellt. Wird in der Windows-Anmeldeinformationsverwaltung dieses Computers gespeichert.',
   'publish.upload': '{count} an die Bibliothek senden',
   'publish.waiting': 'Wartet in der Bibliothek als',
   'publish.refused': 'Die Bibliothek hat es nicht angenommen: {error}',

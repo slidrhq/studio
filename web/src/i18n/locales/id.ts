@@ -49,9 +49,9 @@ const words: Record<MessageKey, string> = {
   'publish.save': 'Simpan',
   'publish.uploadNote':
     'Setiap desain yang disetujui dikirim ke API unggahan pustaka sebagai desain baru, dengan slide, nama, dan tag pencariannya; setiap contoh sebagai templatnya dalam bahasa lain. Pustaka memeriksanya terhadap apa yang diterbitkannya dan menyimpannya sampai editor menerimanya; dari sana desain itu diterbitkan.',
-  'publish.keyTitle': 'Kunci pustaka',
-  'publish.keyHelp':
-    'Kunci studio untuk API pustaka: studio=<key> di LIBRARY_KEYS Worker-nya. Disimpan di Credential Manager Windows di komputer ini.',
+  'publish.tokenTitle': 'Token pustaka',
+  'publish.tokenHelp':
+    'Token dari profil di pustaka, dengan izin "Mengunggah dan menerbitkan", yang dibuat di sana oleh admin pustaka. Disimpan di Credential Manager Windows di komputer ini.',
   'publish.upload': 'Kirim {count} ke pustaka',
   'publish.waiting': 'Menunggu di pustaka sebagai',
   'publish.refused': 'Pustaka tidak menerimanya: {error}',

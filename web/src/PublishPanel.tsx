@@ -99,7 +99,7 @@ export function PublishPanel({
   onClose: () => void;
 }) {
   const t = useT();
-  const [key, setKey] = useState('');
+  const [token, setToken] = useState('');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState<Record<string, UploadItem>>({});
@@ -109,11 +109,11 @@ export function PublishPanel({
   const [publishing, setPublishing] = useState(false);
   const [done, setDone] = useState<Publication>();
   const library = status?.library.url ?? '';
-  const hasKey = status?.library.key ?? false;
+  const hasToken = status?.library.token ?? false;
 
   /** The library's state, and the uploads that wait for it. */
   const readLibrary = useCallback(() => {
-    if (!hasKey) return;
+    if (!hasToken) return;
     Promise.all([api.libraryState(), api.accepted()]).then(
       ([found, { uploads }]) => {
         setState(found);
@@ -122,14 +122,14 @@ export function PublishPanel({
       },
       (failure: unknown) => setLibraryError(message(failure)),
     );
-  }, [hasKey]);
+  }, [hasToken]);
 
   useEffect(readLibrary, [readLibrary]);
 
-  const saveKey = () =>
-    void api.librarySettings(key).then(
+  const saveToken = () =>
+    void api.librarySettings(token).then(
       () => {
-        setKey('');
+        setToken('');
         setError(undefined);
         onStatus();
       },
@@ -243,20 +243,24 @@ export function PublishPanel({
             <p className="muted small">{t('publish.uploadNote')}</p>
           </section>
 
-          {!hasKey && (
+          {!hasToken && (
             <section className="token">
-              <h3>{t('publish.keyTitle')}</h3>
-              <p className="muted small">{t('publish.keyHelp')}</p>
+              <h3>{t('publish.tokenTitle')}</h3>
+              <p className="muted small">{t('publish.tokenHelp')}</p>
               <div className="row">
                 <input
                   type="password"
-                  value={key}
-                  onChange={(event) => setKey(event.target.value)}
-                  placeholder="SLIDR_LIBRARY_KEY"
+                  value={token}
+                  onChange={(event) => setToken(event.target.value)}
+                  placeholder="slk_…"
                   dir="ltr"
                   autoComplete="off"
                 />
-                <button type="button" disabled={key.trim().length < 32} onClick={saveKey}>
+                <button
+                  type="button"
+                  disabled={!/^slk_[A-Za-z0-9_-]{43}$/.test(token.trim())}
+                  onClick={saveToken}
+                >
                   {t('publish.save')}
                 </button>
               </div>
@@ -269,7 +273,7 @@ export function PublishPanel({
               <button
                 type="button"
                 className="primary"
-                disabled={approved.length === 0 || !hasKey || busy}
+                disabled={approved.length === 0 || !hasToken || busy}
                 onClick={send}
               >
                 {t('publish.upload', { count: approved.length })}
@@ -287,7 +291,7 @@ export function PublishPanel({
             </div>
           </section>
 
-          {hasKey && (
+          {hasToken && (
             <section>
               <h3>{t('publish.libraryTitle')}</h3>
               <p className="muted small">{t('publish.libraryNote')}</p>

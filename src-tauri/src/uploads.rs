@@ -6,8 +6,8 @@
 //!
 //! A design goes as `designs: add`, with its picture, its slide in each language it was made in, and
 //! its names and search tags in Hebrew and English (ADR-108 of the app); a template's sample as
-//! `templates: translate`, in its language. The studio signs in as a program, by its key
-//! (`Authorization: Bearer`, the Worker's `LIBRARY_KEYS`).
+//! `templates: translate`, in its language. The studio sends a person's token, all the library
+//! takes from a program (`Authorization: Bearer slk_…`): an admin's, of the `publish` scope.
 
 use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
@@ -163,7 +163,7 @@ pub type Fetched<'a> = Pin<Box<dyn Future<Output = Result<(u16, Vec<u8>), String
 /// How a request reaches the library: over HTTPS, or a test's stand-in. The status and the bytes
 /// of the answer, or why the library could not be reached.
 pub trait Transport: Send + Sync {
-    fn fetch<'a>(&'a self, url: &'a str, key: &'a str, call: Call) -> Fetched<'a>;
+    fn fetch<'a>(&'a self, url: &'a str, token: &'a str, call: Call) -> Fetched<'a>;
 }
 
 /// The library's API over HTTPS.
@@ -174,13 +174,13 @@ pub fn https() -> Arc<dyn Transport> {
 }
 
 impl Transport for Https {
-    fn fetch<'a>(&'a self, url: &'a str, key: &'a str, call: Call) -> Fetched<'a> {
+    fn fetch<'a>(&'a self, url: &'a str, token: &'a str, call: Call) -> Fetched<'a> {
         Box::pin(async move {
             let method =
                 reqwest::Method::from_bytes(call.method.as_bytes()).map_err(|e| e.to_string())?;
             let mut request = net::client()
                 .request(method, format!("{url}{}", call.path))
-                .bearer_auth(key)
+                .bearer_auth(token)
                 .header("Accept", "application/json")
                 .timeout(TIMEOUT);
             if let Some(content_type) = call.content_type {
@@ -194,33 +194,37 @@ impl Transport for Https {
     }
 }
 
-/// The library's API at an address, with the studio's key.
+/// The library's API at an address, with the studio's token.
 pub struct LibraryApi {
     url: String,
-    key: Option<String>,
+    token: Option<String>,
     transport: Arc<dyn Transport>,
 }
 
 impl LibraryApi {
-    pub fn with(url: &str, key: Option<String>, transport: Arc<dyn Transport>) -> Self {
+    pub fn with(url: &str, token: Option<String>, transport: Arc<dyn Transport>) -> Self {
         Self {
             url: url.trim_end_matches('/').to_owned(),
-            key,
+            token,
             transport,
         }
     }
 
     /// A request whose answer is JSON: the status, and the answer (None when it is not JSON).
     async fn call(&self, call: Call) -> Result<(u16, Option<Value>), UploadError> {
-        let key = self.key.as_deref().filter(|key| !key.is_empty()).ok_or_else(|| {
-            UploadError::new(
-                "The studio has no key to the library: set SLIDR_LIBRARY_KEY, or give it in the \
-                 Publish panel.",
-            )
-        })?;
+        let token = self
+            .token
+            .as_deref()
+            .filter(|token| !token.is_empty())
+            .ok_or_else(|| {
+                UploadError::new(
+                    "The studio has no token to the library: make one of the publish scope in its \
+                 profile, and give it in the Publish panel (or set SLIDR_LIBRARY_TOKEN).",
+                )
+            })?;
         let (status, bytes) = self
             .transport
-            .fetch(&self.url, key, call)
+            .fetch(&self.url, token, call)
             .await
             .map_err(|e| UploadError::new(format!("{} could not be reached: {e}", self.url)))?;
         Ok((status, serde_json::from_slice(&bytes).ok()))
@@ -365,7 +369,7 @@ pub mod tests {
     }
 
     impl Transport for Pages {
-        fn fetch<'a>(&'a self, _url: &'a str, _key: &'a str, call: Call) -> Fetched<'a> {
+        fn fetch<'a>(&'a self, _url: &'a str, _token: &'a str, call: Call) -> Fetched<'a> {
             let key = (call.method.to_owned(), call.path.clone());
             self.sent.lock().expect("the log").push((
                 call.method.to_owned(),
@@ -462,7 +466,7 @@ pub mod tests {
         )]);
         let api = LibraryApi::with(
             "https://library.example/",
-            Some("a-key".into()),
+            Some("slk_a-token".into()),
             pages.clone(),
         );
         let refused = api
@@ -483,9 +487,9 @@ pub mod tests {
             .await
             .expect("taken");
         assert_eq!(taken["id"], "u-1");
-        let keyless = LibraryApi::with("https://library.example/", None, pages);
-        let refused = keyless.library().await.expect_err("no key");
-        assert!(refused.message.contains("no key"));
+        let tokenless = LibraryApi::with("https://library.example/", None, pages);
+        let refused = tokenless.library().await.expect_err("no token");
+        assert!(refused.message.contains("no token"));
     }
 
     #[tokio::test]
@@ -518,7 +522,7 @@ pub mod tests {
         ]);
         let api = LibraryApi::with(
             "https://library.example/",
-            Some("a-key".into()),
+            Some("slk_a-token".into()),
             pages.clone(),
         );
         assert_eq!(api.library().await.expect("the state")["accepted"], 3);
