@@ -1,9 +1,7 @@
 export const he = {
   'shell.subtitle': 'עיצובים מוכנים ודוגמאות של תבניות לספרייה · Claude, Codex ו-Cloudflare',
-  'shell.mediaCopyMissing': 'עותק הספרייה',
   'shell.disconnected': 'אין חיבור לסטודיו',
   'shell.displayLanguage': 'שפת התצוגה',
-  'shell.publishing': 'מפרסם…',
   'shell.publish': 'פרסום',
   'shell.publishCount': 'פרסום · {count}',
   'shell.requestsTabs': 'בקשות',
@@ -40,20 +38,13 @@ export const he = {
   'shell.effortHigh': 'גבוה',
   'shell.effortXhigh': 'גבוה מאוד',
   'shell.effortMax': 'מקסימלי',
-  'shell.phasePreparing': 'מכין את הפרסום…',
-  'shell.phasePrepared': 'מוכן לשליחה — בדקו מה ישתנה',
-  'shell.phasePublishing': 'שולח ל-Cloudflare…',
-  'shell.phaseDone': 'פורסם',
-  'shell.phaseFailed': 'הפרסום נכשל',
 };
 
 export const en: Record<keyof typeof he, string> = {
   'shell.subtitle':
     'Ready-made designs and template samples for the library · Claude, Codex and Cloudflare',
-  'shell.mediaCopyMissing': 'Library copy',
   'shell.disconnected': 'Not connected to the studio',
   'shell.displayLanguage': 'Display language',
-  'shell.publishing': 'Publishing…',
   'shell.publish': 'Publish',
   'shell.publishCount': 'Publish · {count}',
   'shell.requestsTabs': 'Requests',
@@ -90,9 +81,4 @@ export const en: Record<keyof typeof he, string> = {
   'shell.effortHigh': 'High',
   'shell.effortXhigh': 'Very high',
   'shell.effortMax': 'Maximum',
-  'shell.phasePreparing': 'Preparing the publish…',
-  'shell.phasePrepared': 'Ready to send — review what will change',
-  'shell.phasePublishing': 'Sending to Cloudflare…',
-  'shell.phaseDone': 'Published',
-  'shell.phaseFailed': 'Publishing failed',
 };

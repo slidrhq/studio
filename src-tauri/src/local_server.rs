@@ -76,7 +76,6 @@ async fn state(State(shared): State<Shared>) -> Json<Value> {
     Json(json!({
         "requests": studio.store.requests(),
         "variants": studio.store.variants(),
-        "publish": studio.library.state(),
     }))
 }
 
@@ -84,11 +83,7 @@ async fn status(State(shared): State<Shared>) -> Json<Value> {
     let settings = &shared.studio.settings;
     let remote = settings.remote().clone();
     Json(json!({
-        "media": {
-            "dir": settings.media_dir,
-            "exists": settings.media_dir.as_ref().is_some_and(|dir| dir.is_dir()),
-            "url": settings.media_url,
-        },
+        "media": {"url": settings.media_url},
         "library": {"url": remote.library_url, "key": remote.library_key.is_some()},
     }))
 }

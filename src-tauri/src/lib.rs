@@ -70,10 +70,9 @@ pub fn run() {
         commands::variant_result,
         commands::library_upload,
         commands::library_settings,
-        commands::publish_prepare,
-        commands::publish_confirm,
-        commands::publish_cancel,
-        commands::cloudflare_settings,
+        commands::library_state,
+        commands::library_accepted,
+        commands::library_publish,
         commands::render_input,
         commands::capture_clip,
         commands::render_done,
@@ -151,29 +150,22 @@ fn gate<R: Runtime>(
 fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     // A build of the repository works where the studio always worked; the installed one in a
     // folder of its own.
-    let (data, media) = match config::repository() {
-        Some(repository) => (
-            repository.join(".data"),
-            repository.parent().map(|parent| parent.join("Slidr-media")),
-        ),
-        None => (app.path().app_local_data_dir()?, None),
+    let data = match config::repository() {
+        Some(repository) => repository.join(".data"),
+        None => app.path().app_local_data_dir()?,
     };
-    let settings = Arc::new(Settings::new(data, media, secrets::library_key()));
+    let settings = Arc::new(Settings::new(data, secrets::library_key()));
     let emitter = app.clone();
     let emit: Emit = Arc::new(move |event| {
         let _ = emitter.emit_to("main", "studio", event);
     });
-    let store = Arc::new(Store::new(settings.requests_dir(), Arc::clone(&emit)));
+    let store = Arc::new(Store::new(settings.requests_dir(), emit));
     store.load();
-    let templates = Arc::new(Templates::new(
-        settings.media_dir.clone(),
-        settings.media_url.clone(),
-    ));
+    let templates = Arc::new(Templates::new(settings.media_url.clone()));
     let library = Arc::new(Library::new(
         Arc::clone(&settings),
         Arc::clone(&store),
         Arc::clone(&templates),
-        emit,
     ));
     let renders = Arc::new(Renders::new(app.clone(), settings.show_render));
     let studio = Arc::new(Studio::new(

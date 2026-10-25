@@ -1477,15 +1477,14 @@ mod tests {
         }
     }
 
-    fn studio(root: &Path, media: Option<PathBuf>) -> Arc<Studio> {
-        let settings = Arc::new(Settings::new(root.to_path_buf(), media.clone(), None));
+    fn studio(root: &Path, templates: Templates) -> Arc<Studio> {
+        let settings = Arc::new(Settings::new(root.to_path_buf(), None));
         let store = Arc::new(store(&settings.requests_dir()));
-        let templates = Arc::new(Templates::new(media, "http://127.0.0.1:9/".into()));
+        let templates = Arc::new(templates);
         let library = Arc::new(Library::new(
             Arc::clone(&settings),
             Arc::clone(&store),
             Arc::clone(&templates),
-            Arc::new(|_| {}),
         ));
         Arc::new(Studio::new(
             settings,
@@ -1532,7 +1531,7 @@ mod tests {
     #[test]
     fn a_variant_is_rendered_in_the_languages_of_its_request() {
         let dir = tempfile::tempdir().expect("a folder");
-        let studio = studio(dir.path(), None);
+        let studio = studio(dir.path(), Templates::new("http://127.0.0.1:9/".into()));
         let mut draft = Request::draft(RequestKind::Design, "x".into());
         draft.languages = Some(langs(&["he", "en", "ar", "ja"]));
         let request = studio.store.create_request(draft);
@@ -1577,7 +1576,7 @@ mod tests {
     #[test]
     fn a_variant_from_before_the_choice_is_hebrew_and_english() {
         let dir = tempfile::tempdir().expect("a folder");
-        let studio = studio(dir.path(), None);
+        let studio = studio(dir.path(), Templates::new("http://127.0.0.1:9/".into()));
         let request = studio
             .store
             .create_request(Request::draft(RequestKind::Design, "x".into()));
@@ -1609,7 +1608,7 @@ mod tests {
     #[tokio::test]
     async fn a_template_request_has_no_more_concepts() {
         let dir = tempfile::tempdir().expect("a folder");
-        let studio = studio(dir.path(), None);
+        let studio = studio(dir.path(), Templates::new("http://127.0.0.1:9/".into()));
         let mut draft = Request::draft(RequestKind::Template, String::new());
         draft.template_id = Some("mifgash".into());
         draft.languages = Some(langs(&["de"]));
@@ -1624,9 +1623,7 @@ mod tests {
     #[tokio::test]
     async fn a_template_variant_writes_one_sample_and_is_rendered_from_it() {
         let dir = tempfile::tempdir().expect("a folder");
-        let media = dir.path().join("media");
-        write_json(&media.join("templates/catalog.json"), &catalog()).expect("written");
-        let studio = studio(&dir.path().join("data"), Some(media));
+        let studio = studio(dir.path(), Templates::seeded(catalog()));
         let mut draft = Request::draft(RequestKind::Template, String::new());
         draft.template_id = Some("mifgash".into());
         draft.languages = Some(langs(&["de"]));

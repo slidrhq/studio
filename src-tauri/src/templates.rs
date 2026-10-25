@@ -2,9 +2,10 @@
 //!
 //! A template request writes the sample deck of one built-in template in languages: one it is not
 //! written in yet (a translation), or one it has (a rewrite the person describes). Each language is
-//! a variant of the request, with its own Claude conversation, and each is published by itself into
-//! `templates/catalog.json`, under `samples[<template>][<lang>]` (docs/media-library.md). A deck in a
-//! language a sample is written in gets it; any other gets the English one ([ADR-098]).
+//! a variant of the request, with its own Claude conversation, and each is uploaded by itself to the
+//! library, which publishes it into `templates/catalog.json`, under `samples[<template>][<lang>]`
+//! (docs/media-library.md). A deck in a language a sample is written in gets it; any other gets the
+//! English one ([ADR-098]).
 //!
 //! ```text
 //! <variant>/work/brief.json      the task: the template, its names, the language, the person's words
@@ -15,15 +16,15 @@
 //! <variant>/work/template.json   the template as the catalog holds it, for the render page
 //! ```
 //!
-//! The catalog read is the author copy's (`../Slidr-media`), which is what publishing sends, and the
-//! published one when there is no author copy.
+//! The catalog read is the published one (`SLIDR_MEDIA_URL`), read again after ten minutes, or once
+//! a publication has changed it.
 
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::HashMap,
     fs,
-    path::{Path, PathBuf},
+    path::Path,
     sync::Arc,
-    time::{Duration, Instant, SystemTime},
+    time::{Duration, Instant},
 };
 
 use serde::Serialize;
@@ -37,7 +38,7 @@ use crate::{
 };
 
 pub const CATALOG: &str = "templates/catalog.json";
-/// How long a published catalog read is kept; the author copy is read again when it changes.
+/// How long the published catalog read is kept.
 const PUBLISHED_TTL: Duration = Duration::from_secs(600);
 
 /// A built-in template, with the languages its sample is written in and those it lacks.
@@ -75,104 +76,6 @@ pub fn missing_languages(samples: Option<&Value>) -> Vec<String> {
 
 fn template_id(template: &Value) -> Option<&str> {
     template.pointer("/theme/id").and_then(Value::as_str)
-}
-
-/// Puts a template's sample in one language into a catalog of templates, replacing the one it
-/// had, and keeps the languages of every sample in the registry's order.
-pub fn merge_sample(
-    catalog: &mut Value,
-    id: &str,
-    lang: &str,
-    slides: Value,
-) -> Result<(), String> {
-    let known = items(catalog.get("templates"))
-        .iter()
-        .any(|template| template_id(template) == Some(id));
-    if !known {
-        return Err(format!("The catalog has no template {id}."));
-    }
-    let Some(catalog) = catalog.as_object_mut() else {
-        return Err("The catalog of templates is not an object.".into());
-    };
-    let samples = catalog
-        .entry("samples")
-        .or_insert_with(|| Value::Object(Map::new()));
-    if !samples.is_object() {
-        *samples = Value::Object(Map::new());
-    }
-    let Some(samples) = samples.as_object_mut() else {
-        return Ok(());
-    };
-    let mut mine = samples
-        .get(id)
-        .and_then(Value::as_object)
-        .cloned()
-        .unwrap_or_default();
-    mine.insert(lang.to_owned(), slides);
-    let mut ordered = Map::new();
-    for code in CONTENT_LANGUAGES {
-        if let Some(value) = mine.get(code) {
-            ordered.insert(code.to_owned(), value.clone());
-        }
-    }
-    for (code, value) in &mine {
-        if !languages::is_content(code) {
-            ordered.insert(code.clone(), value.clone());
-        }
-    }
-    samples.insert(id.to_owned(), Value::Object(ordered));
-    Ok(())
-}
-
-/// Where a catalog of templates differs from the published one, beside the samples in `ours`
-/// ((template, language) pairs): the author's work that is not published yet, which a publication
-/// of the file sends too. A part of the catalog, a template, or a sample in a language, as
-/// `templates/catalog.json: samples.shidur.de`.
-pub fn catalog_changes(
-    local: &Value,
-    published: Option<&Value>,
-    ours: &HashSet<(String, String)>,
-) -> Vec<String> {
-    let (Some(local), Some(published)) = (local.as_object(), published.and_then(Value::as_object))
-    else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    let keys: BTreeSet<&String> = local.keys().chain(published.keys()).collect();
-    for key in keys {
-        // Equal whatever the order of their keys, as `json.dumps(sort_keys=True)` compared them.
-        if key != "samples" && local.get(key) != published.get(key) {
-            out.push(format!("{CATALOG}: {key}"));
-        }
-    }
-    let empty = Map::new();
-    let samples =
-        |side: &Map<String, Value>| side.get("samples").and_then(Value::as_object).cloned();
-    let (mine, theirs) = (
-        samples(local).unwrap_or_default(),
-        samples(published).unwrap_or_default(),
-    );
-    let ids: BTreeSet<&String> = mine.keys().chain(theirs.keys()).collect();
-    for id in ids {
-        let a = mine.get(id).and_then(Value::as_object).unwrap_or(&empty);
-        let b = theirs.get(id).and_then(Value::as_object).unwrap_or(&empty);
-        for lang in CONTENT_LANGUAGES {
-            if !(a.contains_key(lang) || b.contains_key(lang)) {
-                continue;
-            }
-            if !ours.contains(&(id.clone(), lang.to_owned())) && a.get(lang) != b.get(lang) {
-                out.push(format!("{CATALOG}: samples.{id}.{lang}"));
-            }
-        }
-    }
-    out
-}
-
-/// The catalog as `export-templates.mjs` writes it (`JSON.stringify(catalog)`: no spaces, no line
-/// end), so that publishing changes no byte of it but the sample. Indented, the catalog of
-/// sixteen-language samples would pass the 25 MB that Pages serves of a file.
-pub fn encode_catalog(catalog: &Value) -> Vec<u8> {
-    serde_json::to_vec(catalog).unwrap_or_default()
 }
 
 /* ---------------------------------------------------------------------- what Claude reads */
@@ -385,69 +288,46 @@ pub fn sample_file(lang: &str) -> String {
     format!("{lang}.json")
 }
 
-/// When a catalog was read, and from where.
-#[derive(Clone, PartialEq)]
-enum Read {
-    Local(SystemTime),
-    Published(Instant),
-}
-
 /// The catalog of templates, read when it is asked for.
 pub struct Templates {
-    media_dir: Option<PathBuf>,
     media_url: String,
-    read: tokio::sync::Mutex<Option<(Read, Arc<Value>)>>,
+    read: tokio::sync::Mutex<Option<(Instant, Arc<Value>)>>,
 }
 
 impl Templates {
-    pub fn new(media_dir: Option<PathBuf>, media_url: String) -> Self {
+    pub fn new(media_url: String) -> Self {
         Self {
-            media_dir,
             media_url,
             read: tokio::sync::Mutex::new(None),
         }
     }
 
-    pub fn local(&self) -> Option<PathBuf> {
-        self.media_dir.as_ref().map(|dir| dir.join(CATALOG))
+    /// The templates of a catalog given, as though just read: for a test.
+    #[cfg(test)]
+    pub fn seeded(catalog: Value) -> Self {
+        Self {
+            media_url: "http://127.0.0.1:9/".into(),
+            read: tokio::sync::Mutex::new(Some((Instant::now(), Arc::new(catalog)))),
+        }
     }
 
-    /// The author copy's catalog when there is one, else the published one.
+    /// The published catalog of templates.
     pub async fn catalog(&self) -> Result<Arc<Value>, String> {
         let mut read = self.read.lock().await;
-        let local = self.local().filter(|path| path.is_file());
-        let (key, data) = if let Some(local) = local {
-            let modified = fs::metadata(&local)
-                .and_then(|meta| meta.modified())
-                .unwrap_or(SystemTime::UNIX_EPOCH);
-            let key = Read::Local(modified);
-            if let Some((known, data)) = read.as_ref()
-                && *known == key
-            {
-                return Ok(Arc::clone(data));
-            }
-            let text =
-                fs::read_to_string(&local).map_err(|e| format!("{}: {e}", local.display()))?;
-            let data: Value =
-                serde_json::from_str(&text).map_err(|e| format!("{}: {e}", local.display()))?;
-            (key, data)
-        } else {
-            if let Some((Read::Published(at), data)) = read.as_ref()
-                && at.elapsed() < PUBLISHED_TTL
-            {
-                return Ok(Arc::clone(data));
-            }
-            let url = format!("{}/{CATALOG}", self.media_url.trim_end_matches('/'));
-            let data = net::fetch_json(&url, Duration::from_secs(120))
-                .await
-                .map_err(|e| format!("Could not read the library's templates ({url}): {e}"))?;
-            (Read::Published(Instant::now()), data)
-        };
+        if let Some((at, data)) = read.as_ref()
+            && at.elapsed() < PUBLISHED_TTL
+        {
+            return Ok(Arc::clone(data));
+        }
+        let url = format!("{}/{CATALOG}", self.media_url.trim_end_matches('/'));
+        let data = net::fetch_json(&url, Duration::from_secs(120))
+            .await
+            .map_err(|e| format!("Could not read the library's templates ({url}): {e}"))?;
         if !data.get("templates").is_some_and(Value::is_array) {
             return Err("The catalog of templates holds no templates.".into());
         }
         let data = Arc::new(data);
-        *read = Some((key, Arc::clone(&data)));
+        *read = Some((Instant::now(), Arc::clone(&data)));
         Ok(data)
     }
 
@@ -647,54 +527,11 @@ pub mod tests {
         assert!(!missing.iter().any(|lang| lang == "he" || lang == "en"));
     }
 
-    #[test]
-    fn a_sample_is_merged_in_the_registrys_order_and_written_as_node_writes_it() {
-        let mut catalog = catalog();
-        merge_sample(
-            &mut catalog,
-            "mifgash",
-            "ja",
-            json!([{"layout": "l_cards"}]),
-        )
-        .expect("merged");
-        merge_sample(
-            &mut catalog,
-            "mifgash",
-            "de",
-            json!([{"layout": "l_cards"}]),
-        )
-        .expect("merged");
-        let order: Vec<&String> = catalog["samples"]["mifgash"]
-            .as_object()
-            .map(|samples| samples.keys().collect())
-            .unwrap_or_default();
-        assert_eq!(order, ["he", "en", "de", "ja"]);
-        merge_sample(
-            &mut catalog,
-            "mifgash",
-            "de",
-            json!([{"layout": "l_cards", "name": "Drei"}]),
-        )
-        .expect("merged");
-        assert_eq!(
-            catalog["samples"]["mifgash"]["de"],
-            json!([{"layout": "l_cards", "name": "Drei"}])
-        );
-        assert!(merge_sample(&mut catalog, "nosuch", "de", json!([])).is_err());
-        // `JSON.stringify(…)`: no spaces and no line end, letters as they are.
-        assert_eq!(
-            encode_catalog(&json!({"a": [1, {"b": "שלום"}]})),
-            "{\"a\":[1,{\"b\":\"שלום\"}]}".as_bytes()
-        );
-    }
-
     #[tokio::test]
     async fn the_listing_names_each_template_in_the_apps_words() {
-        let dir = tempfile::tempdir().expect("a folder");
         let mut catalog = catalog();
         catalog["samples"]["mifgash"]["de"] = english();
-        write_json(&dir.path().join(CATALOG), &catalog).expect("written");
-        let templates = Templates::new(Some(dir.path().to_path_buf()), "http://unused/".into());
+        let templates = Templates::seeded(catalog);
         let listing = templates
             .listing(&json!({"he": {"name": {"mifgash": "מפגש"}}}))
             .await
@@ -730,8 +567,7 @@ pub mod tests {
         let dir = tempfile::tempdir().expect("a folder");
         let mut catalog = catalog();
         catalog["samples"]["mifgash"]["de"] = english();
-        write_json(&dir.path().join("media").join(CATALOG), &catalog).expect("written");
-        let templates = Templates::new(Some(dir.path().join("media")), "http://unused/".into());
+        let templates = Templates::seeded(catalog);
         let mut entry = listing_entry();
         entry.languages.push("de".into());
         let brief = template_brief(&entry, entry.name.clone(), "de", "");
@@ -745,23 +581,5 @@ pub mod tests {
             serde_json::from_str(&fs::read_to_string(work.join("de.json")).expect("de.json"))
                 .expect("JSON");
         assert_eq!(written, english());
-    }
-
-    #[test]
-    fn the_catalogs_unpublished_work_is_listed_beside_ours() {
-        let published = catalog();
-        let mut local = catalog();
-        local["samples"]["mifgash"]["ar"] = hebrew();
-        local["samples"]["mifgash"]["ja"] = english();
-        local["pictures"] = json!({"x": {"id": "1"}});
-        let ours = HashSet::from([("mifgash".to_owned(), "ar".to_owned())]);
-        assert_eq!(
-            catalog_changes(&local, Some(&published), &ours),
-            [
-                "templates/catalog.json: pictures",
-                "templates/catalog.json: samples.mifgash.ja"
-            ]
-        );
-        assert!(catalog_changes(&local, None, &ours).is_empty());
     }
 }

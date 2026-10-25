@@ -135,25 +135,38 @@ export interface Variant {
   updatedAt: number;
 }
 
-export interface PublishReport {
-  files: number;
-  bytes: number;
-  before: number;
-  added: string[];
-  changed: string[];
-  removed: string[];
-  blocked: string | null;
-  ours: string[];
-  unexpected: string[];
+/** An upload of the library that a publication takes, or took: what it is, and what it wrote. */
+export interface LibraryUpload {
+  id: string;
+  type: string;
+  action: string;
+  target: string;
+  languages: string[];
+  by?: string | null;
+  updated?: string;
+  /** The files of the library it wrote, once it was published. */
+  paths?: string[];
 }
 
-export interface PublishState {
-  phase: 'idle' | 'preparing' | 'prepared' | 'publishing' | 'done' | 'failed';
-  items: string[];
-  report: PublishReport | null;
-  log: { t: number; text: string }[];
-  error: string | null;
-  at: number | null;
+/** Where the published library is, as the library says (`GET /api/library` of its API). */
+export interface LibraryState {
+  /** Whether the library is in its bucket, where a publication writes. */
+  live: boolean;
+  published?: string;
+  files?: number;
+  bytes?: number;
+  /** The uploads the next publication takes. */
+  accepted: number;
+}
+
+/** What came of a publication (`POST /api/publish` of the library's API). */
+export interface Publication {
+  published?: string;
+  uploads: LibraryUpload[];
+  skipped: { id: string; message: string; issues?: { path: string; message: string }[] }[];
+  added: string[];
+  changed: string[];
+  remaining: number;
 }
 
 export interface ProgramStatus {
@@ -166,9 +179,8 @@ export interface ProgramStatus {
 
 export interface ServerStatus {
   programs: ProgramStatus[];
-  /** The author copy of the library, when one is named; and the published library. */
-  media: { dir: string | null; exists: boolean; url: string };
-  cloudflare: { accountId: string; token: boolean };
+  /** Where the library is published, which the studio reads. */
+  media: { url: string };
   /** Slidr Library, whose upload API takes the approved work, and whether the studio has its key. */
   library: { url: string; key: boolean };
 }
@@ -196,7 +208,6 @@ export interface LibraryInfo {
 interface State {
   requests: StudioRequest[];
   variants: Record<string, Variant>;
-  publish: PublishState;
   connected: boolean;
   loaded: boolean;
 }
@@ -213,7 +224,6 @@ export const isRunning = (variant: Variant) => RUNNING.has(variant.status);
 let state: State = {
   requests: [],
   variants: {},
-  publish: { phase: 'idle', items: [], report: null, log: [], error: null, at: null },
   connected: false,
   loaded: false,
 };
@@ -237,12 +247,10 @@ async function load() {
   const data = await call<{
     requests: StudioRequest[];
     variants: Variant[];
-    publish: PublishState;
   }>('studio_state');
   set({
     requests: data.requests,
     variants: Object.fromEntries(data.variants.map((variant) => [variant.id, variant])),
-    publish: data.publish,
     loaded: true,
   });
 }
@@ -250,8 +258,7 @@ async function load() {
 type StudioEvent =
   | { type: 'request'; request: StudioRequest }
   | { type: 'requestDeleted'; id: string }
-  | { type: 'variant'; variant: Variant }
-  | { type: 'publish'; publish: PublishState };
+  | { type: 'variant'; variant: Variant };
 
 let listening = false;
 
@@ -280,10 +287,8 @@ function receive(event: StudioEvent) {
     set({ requests: [...others, event.request].sort((a, b) => a.createdAt - b.createdAt) });
   } else if (event.type === 'requestDeleted') {
     set({ requests: state.requests.filter((request) => request.id !== event.id) });
-  } else if (event.type === 'variant') {
-    set({ variants: { ...state.variants, [event.variant.id]: event.variant } });
   } else {
-    set({ publish: event.publish });
+    set({ variants: { ...state.variants, [event.variant.id]: event.variant } });
   }
 }
 
@@ -324,15 +329,17 @@ export const api = {
   newImage: (vid: string, instruction: string) => call('variant_image', { vid, instruction }),
   approve: (vid: string, value: boolean) => call('variant_approve', { vid, value }),
   discard: (vid: string, value: boolean) => call('variant_discard', { vid, value }),
-  prepare: (variantIds?: string[]) => call('publish_prepare', { variantIds: variantIds ?? null }),
-  confirm: () => call('publish_confirm'),
-  cancelPublish: () => call('publish_cancel'),
+  /** The uploads the library's editors accepted, which the next publication takes. */
+  accepted: () => call<{ uploads: LibraryUpload[] }>('library_accepted'),
+  /** Where the published library is, and how many uploads wait for it. */
+  libraryState: () => call<LibraryState>('library_state'),
+  /** Has the library publish its accepted uploads (or those named), through its API. */
+  publish: (uploadIds?: string[]) =>
+    call<Publication>('library_publish', { uploadIds: uploadIds ?? null }),
   upload: (variantIds?: string[]) =>
     call<{ items: UploadItem[] }>('library_upload', { variantIds: variantIds ?? null }),
   librarySettings: (key: string, url = '') =>
     call<{ url: string; key: boolean }>('library_settings', { key, url }),
-  cloudflare: (token: string, accountId: string) =>
-    call<{ accountId: string; token: boolean }>('cloudflare_settings', { token, accountId }),
 };
 
 /** A file of a variant's working folder, through the studio's `studio:` protocol. */

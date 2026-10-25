@@ -1,10 +1,9 @@
-//! Finding the programs the studio runs: Claude Code and the Codex CLI (and Node, for the script
-//! that publishes the author copy).
+//! Finding the programs the studio runs: Claude Code and the Codex CLI.
 //!
 //! Searched as the app searches (`src-tauri/src/harness/setup.rs`): the PATH, then the places
 //! installers put programs without adding them to it. The Codex CLI is also found inside the
-//! ChatGPT extension of VS Code, which ships the same native program. `CLAUDE_PATH`, `CODEX_PATH`
-//! and `NODE_PATH_EXE` name a program outright.
+//! ChatGPT extension of VS Code, which ships the same native program. `CLAUDE_PATH` and
+//! `CODEX_PATH` name a program outright.
 
 use std::{
     env,
@@ -223,10 +222,6 @@ pub fn find_codex() -> Option<PathBuf> {
                 .and_then(|meta| meta.modified())
                 .unwrap_or(SystemTime::UNIX_EPOCH)
         })
-}
-
-pub fn find_node() -> Option<PathBuf> {
-    named("NODE_PATH_EXE").or_else(|| which("node"))
 }
 
 /// What is installed and signed in, for the studio's status line.

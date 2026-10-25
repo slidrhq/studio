@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use tauri::{State, WebviewWindow, ipc::Response};
 
 use crate::{
-    languages,
+    languages, library,
     pipeline::Studio,
     programs,
     render::{self, Done, Rect, Renders},
@@ -38,19 +38,10 @@ fn too_long(text: &str, most: usize, what: &str) -> Answer<()> {
 #[tauri::command]
 pub async fn studio_status(studio: State<'_, Arc<Studio>>) -> Answer {
     let found = programs::probe().await;
-    let settings = &studio.settings;
-    let remote = settings.remote().clone();
+    let remote = studio.settings.remote().clone();
     Ok(json!({
         "programs": found,
-        "media": {
-            "dir": settings.media_dir,
-            "exists": settings.media_dir.as_ref().is_some_and(|dir| dir.is_dir()),
-            "url": settings.media_url,
-        },
-        "cloudflare": {
-            "accountId": remote.cloudflare_account_id,
-            "token": remote.cloudflare_token.is_some(),
-        },
+        "media": {"url": studio.settings.media_url},
         "library": {"url": remote.library_url, "key": remote.library_key.is_some()},
     }))
 }
@@ -60,7 +51,6 @@ pub fn studio_state(studio: State<'_, Arc<Studio>>) -> Value {
     json!({
         "requests": studio.store.requests(),
         "variants": studio.store.variants(),
-        "publish": studio.library.state(),
     })
 }
 
@@ -326,46 +316,34 @@ pub fn library_settings(
     Ok(json!({"url": remote.library_url, "key": remote.library_key.is_some()}))
 }
 
+/// Where the published library is, when it was published, and how many uploads wait for it.
 #[tauri::command]
-pub async fn publish_prepare(
+pub async fn library_state(studio: State<'_, Arc<Studio>>) -> Answer {
+    studio.library.state().await
+}
+
+/// The uploads the library's editors accepted, which the next publication takes.
+#[tauri::command]
+pub async fn library_accepted(studio: State<'_, Arc<Studio>>) -> Answer {
+    Ok(json!({"uploads": studio.library.accepted().await?}))
+}
+
+/// Has the library publish its accepted uploads (or those named), through its API.
+#[tauri::command]
+pub async fn library_publish(
     studio: State<'_, Arc<Studio>>,
-    variant_ids: Option<Vec<String>>,
+    upload_ids: Option<Vec<String>>,
 ) -> Answer {
-    let vids = variant_ids.unwrap_or_else(|| approved(&studio));
-    studio.library.prepare(&vids).await?;
-    Ok(json!(studio.library.state()))
-}
-
-#[tauri::command]
-pub async fn publish_confirm(studio: State<'_, Arc<Studio>>) -> Answer {
-    studio.library.confirm().await?;
-    Ok(json!(studio.library.state()))
-}
-
-#[tauri::command]
-pub async fn publish_cancel(studio: State<'_, Arc<Studio>>) -> Answer {
-    studio.library.cancel().await?;
-    Ok(json!(studio.library.state()))
-}
-
-/// The Cloudflare token of the author copy's publication, kept in this process's memory only.
-#[tauri::command]
-pub fn cloudflare_settings(
-    studio: State<'_, Arc<Studio>>,
-    token: Option<String>,
-    account_id: Option<String>,
-) -> Answer {
-    let mut remote = studio.settings.remote();
-    remote.cloudflare_token = token.map(|t| t.trim().to_owned()).filter(|t| !t.is_empty());
-    if let Some(account) = account_id
-        .map(|a| a.trim().to_owned())
-        .filter(|a| !a.is_empty())
+    if upload_ids
+        .as_ref()
+        .is_some_and(|ids| ids.len() > library::MOST_PUBLISHED)
     {
-        remote.cloudflare_account_id = account;
+        return Err(format!(
+            "A publication names at most {} uploads.",
+            library::MOST_PUBLISHED
+        ));
     }
-    Ok(
-        json!({"accountId": remote.cloudflare_account_id, "token": remote.cloudflare_token.is_some()}),
-    )
+    studio.library.publish(upload_ids.as_deref()).await
 }
 
 /* ------------------------------------------------------------------ the render windows */

@@ -1,9 +1,9 @@
 //! Where things are, and what can be changed through the environment.
 //!
-//! A build of the repository (`pnpm tauri dev`) keeps its work in the repository's `.data` and
-//! reads the media library's author copy beside the repository (`../Slidr-media`), as the studio
-//! always has. The installed studio keeps its work in its own folder of the user's local
-//! application data, and reads an author copy only where `SLIDR_MEDIA_DIR` names one.
+//! A build of the repository (`pnpm tauri dev`) keeps its work in the repository's `.data`, as the
+//! studio always has; the installed studio in its own folder of the user's local application data.
+//! The media library is read where it is published (`SLIDR_MEDIA_URL`), and written only through
+//! Slidr Library's API (`SLIDR_LIBRARY_URL`): there is no copy of it here.
 
 use std::{
     env,
@@ -11,9 +11,7 @@ use std::{
     sync::{Mutex, MutexGuard, PoisonError},
 };
 
-/// The Cloudflare account of the media library (docs/media-library.md). Not a secret.
-const DEFAULT_ACCOUNT_ID: &str = "d3a1982ae102ceb45926da85e92d6edf";
-const DEFAULT_MEDIA_URL: &str = "https://slidr-media.pages.dev/";
+const DEFAULT_MEDIA_URL: &str = "https://media.slidr.studio/";
 /// Slidr Library, whose upload API takes the studio's work (`uploads.rs`).
 const DEFAULT_LIBRARY_URL: &str = "https://library.slidr.workers.dev/";
 
@@ -48,26 +46,20 @@ fn number(name: &str, default: usize) -> usize {
         .unwrap_or(default)
 }
 
-/// What the person may change while the studio runs: the library and the keys to it.
+/// What the person may change while the studio runs: the library and the key to it.
 #[derive(Debug, Clone)]
 pub struct Remote {
     /// The library whose API the approved work is uploaded to.
     pub library_url: String,
     /// The studio's key to it (the Worker's `LIBRARY_KEYS`, `studio=<key>`).
     pub library_key: Option<String>,
-    pub cloudflare_account_id: String,
-    /// Kept in memory only, unless it came from the environment.
-    pub cloudflare_token: Option<String>,
 }
 
 pub struct Settings {
     /// Requests, variants, their files and logs. Never published.
     pub data: PathBuf,
-    /// The author copy of the media library, which `pnpm media:publish` stages from.
-    pub media_dir: Option<PathBuf>,
+    /// Where the media library is published, which the studio reads.
     pub media_url: String,
-    /// The app's script that publishes the author copy, in a build of the repository.
-    pub publish_script: Option<PathBuf>,
     /// Processes that may run at once. Four Codex images at a time is what the app measured
     /// (ADR-004).
     pub max_claude: usize,
@@ -82,16 +74,11 @@ pub struct Settings {
 }
 
 impl Settings {
-    /// The settings of the environment, over `data` and `media_dir` where it names none.
-    pub fn new(data: PathBuf, media_dir: Option<PathBuf>, library_key: Option<String>) -> Self {
-        let repository = repository();
+    /// The settings of the environment, over `data` where it names none.
+    pub fn new(data: PathBuf, library_key: Option<String>) -> Self {
         Self {
             data: path("SLIDR_STUDIO_DATA").unwrap_or(data),
-            media_dir: path("SLIDR_MEDIA_DIR").or(media_dir),
             media_url: text("SLIDR_MEDIA_URL").unwrap_or_else(|| DEFAULT_MEDIA_URL.into()),
-            publish_script: repository
-                .map(|repo| repo.join("vendor/desktop/scripts/media-publish.mjs"))
-                .filter(|script| script.is_file()),
             max_claude: number("SLIDR_STUDIO_MAX_CLAUDE", 4).max(1),
             max_codex: number("SLIDR_STUDIO_MAX_CODEX", 4).max(1),
             max_render: number("SLIDR_STUDIO_MAX_RENDER", 2).max(1),
@@ -104,9 +91,6 @@ impl Settings {
                 library_url: text("SLIDR_LIBRARY_URL")
                     .unwrap_or_else(|| DEFAULT_LIBRARY_URL.into()),
                 library_key: text("SLIDR_LIBRARY_KEY").or(library_key),
-                cloudflare_account_id: text("CLOUDFLARE_ACCOUNT_ID")
-                    .unwrap_or_else(|| DEFAULT_ACCOUNT_ID.into()),
-                cloudflare_token: text("CLOUDFLARE_API_TOKEN"),
             }),
         }
     }

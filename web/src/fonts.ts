@@ -9,7 +9,7 @@
 import { familyForLetters, type FontFamilyEntry } from '@slidr/model';
 import { hebrewFace, hebrewFaces, setFontCounterparts } from '@slidr/renderer';
 
-export const MEDIA_URL = 'https://slidr-media.pages.dev/';
+export const MEDIA_URL = 'https://media.slidr.studio/';
 
 interface Face {
   family: string;
