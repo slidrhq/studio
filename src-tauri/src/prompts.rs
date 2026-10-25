@@ -356,6 +356,19 @@ pub fn plan_prompt(
     } else {
         "Plan one design.".to_owned()
     };
+    let composition = "Start each concept from its own composition idea, found in the occasion \
+                       and its world (its objects, rituals, numbers, words, places), not from a \
+                       layout you have used before. The easy answer, a column of text on one \
+                       side and the picture in a panel, circle, arch or card on the other, is a \
+                       template: use it for one concept of a plan at most. The gallery's best \
+                       designs each find a form that belongs to their subject (a centred title \
+                       over a row of candles, a huge number, the details on signposts): take \
+                       them as the measure of invention, not as a list to pick from. Let the \
+                       idea decide where the text stands, how large the picture is, and what \
+                       form the details take, not only the colour of the shape. Where the \
+                       request lists layouts or a structure for the text, read it as examples \
+                       and a floor of quality, not the whole repertoire, unless it asks for \
+                       exactly that. Say the composition in the first sentence of `art`.";
     let codes = listing(langs.iter().map(|lang| format!("`{lang}`")), "and");
     let names_only = if only_base(langs) {
         ""
@@ -378,6 +391,8 @@ pub fn plan_prompt(
 </studio_request>
 
 {many} {wanted}
+
+{composition}
 
 Each design is made in {}, and in no other language.
 

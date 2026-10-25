@@ -635,11 +635,12 @@ impl Studio {
             .iter()
             .filter_map(|vid| self.store.variant(vid))
             .map(|variant| {
-                let concept = variant
-                    .brief
-                    .design()
-                    .map_or("", |design| design.concept.as_str());
-                format!("{}: {concept}", variant.brief.name().en)
+                let design = variant.brief.design();
+                let concept = design.map_or("", |design| design.concept.as_str());
+                let layout = design
+                    .and_then(|design| design.art.split(". ").next())
+                    .unwrap_or("");
+                format!("{}: {concept} Layout: {layout}.", variant.brief.name().en)
             })
             .collect();
         let group = request.group.as_deref().filter(|group| !group.is_empty());
@@ -656,7 +657,7 @@ impl Studio {
         if !made.is_empty() {
             prompt.push_str(
                 "\n\nThis request already has these designs; the new ones must differ from each of \
-                 them:\n",
+                 them, in composition as well as in concept:\n",
             );
             prompt.push_str(
                 &made
