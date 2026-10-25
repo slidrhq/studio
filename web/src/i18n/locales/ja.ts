@@ -4,7 +4,7 @@ const words: Record<MessageKey, string> = {
   'shell.subtitle':
     'ライブラリ用の既成デザインとテンプレートのサンプル · Claude、Codex、Cloudflare',
   'shell.mediaCopyMissing': 'ライブラリのコピー',
-  'shell.disconnected': 'サーバーとの接続が切れています',
+  'shell.disconnected': 'スタジオに接続されていません',
   'shell.displayLanguage': '表示言語',
   'shell.publishing': '公開中…',
   'shell.publish': '公開',
@@ -58,7 +58,7 @@ const words: Record<MessageKey, string> = {
     '承認された各デザインは、スライド・名前・検索タグとともに新しいデザインとしてメディアライブラリのアップロード API に送られます。各サンプルは、そのテンプレートの別言語版として送られます。ライブラリは公開中の内容と照らし合わせて確認し、編集者が承認するまで保管します。公開はそこから行われます。',
   'publish.keyTitle': 'メディアライブラリのキー',
   'publish.keyHelp':
-    'メディアライブラリの API に対するスタジオのキー：Worker の LIBRARY_KEYS にある studio=<key>。このサーバーのメモリにのみ保持されます。',
+    'メディアライブラリの API に対するスタジオのキー：Worker の LIBRARY_KEYS にある studio=<key>。このコンピューターの Windows 資格情報マネージャーに保存されます。',
   'publish.upload': '{count} 件をメディアライブラリに送る',
   'publish.waiting': 'メディアライブラリで待機中：',
   'publish.refused': 'メディアライブラリに受け付けられませんでした：{error}',

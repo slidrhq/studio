@@ -46,3 +46,9 @@ for (const dir of packages) {
 const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: app, encoding: 'utf8' }).trim();
 writeFileSync(join(vendor, 'COMMIT'), `${commit}\n`);
 console.log(`Copied ${files.length} files of the app at ${commit.slice(0, 7)}.`);
+
+// The app's instructions to its design agent, as the studio's binary carries them
+// (src-tauri/instructions.json).
+execFileSync(process.execPath, [join(root, 'web', 'tools', 'instructions.mjs'), '--write'], {
+  stdio: 'inherit',
+});

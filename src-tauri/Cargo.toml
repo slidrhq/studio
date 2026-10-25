@@ -1,0 +1,65 @@
+[package]
+name = "slidr-studio"
+version = "0.1.0"
+description = "Slidr Studio: the content of Slidr's media library, made with Claude Code and Codex"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "slidr_studio_lib"
+
+[lints]
+workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+# Links that leave the studio (the library, an upload on its page) open in the system's browser.
+tauri-plugin-opener = "2"
+# One studio at a time: two would run the same requests in the same folder.
+tauri-plugin-single-instance = "2"
+# Updates of the studio (src/updates.rs): the release's signed installer, from GitHub releases.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["native-tls", "system-proxy"] }
+serde = { version = "1", features = ["derive"] }
+# In the order they were written: a catalog the studio writes back changes no byte but its own
+# part, and Claude reads a brief in the order it was planned.
+serde_json = { version = "1", features = ["preserve_order"] }
+# Claude Code and the Codex CLI as child processes, their pipes and timeouts; the slots that limit
+# how many run at once.
+tokio = { version = "1", features = ["process", "io-util", "sync", "time", "macros", "rt", "fs", "net"] }
+# The token a request's or a variant's work is stopped by.
+tokio-util = "0.7"
+# The media library, the font catalog and the library's upload API. TLS is the operating system's.
+reqwest = { version = "0.13.5", default-features = false, features = ["native-tls", "json", "system-proxy"] }
+# The read-only answers Slidr Library reads on this machine (src/local_server.rs). HTTP/1 only.
+axum = { version = "0.8.9", default-features = false, features = ["tokio", "http1", "query", "json"] }
+# The picture's size, and its decoding for the library's WebP.
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+# The library keeps a design's picture as lossy WebP, which `image` does not write.
+webp = { version = "0.3", default-features = false }
+# Whether Claude changed a file; the published files' hashes.
+sha2 = "0.10"
+uuid = { version = "1", features = ["v4"] }
+# The ids of requests and variants carry the local time they were made at.
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# A screenshot of WebView2's DevTools protocol.
+base64 = "0.22"
+# The path of a variant's file in a `studio:` URL.
+percent-encoding = "2"
+# The studio's key to the library's upload API, in the credential store of the operating system.
+keyring = "4.2"
+
+# The pictures of a render window: Page.captureScreenshot through the WebView2 DevTools protocol,
+# at the versions wry already uses. A job object ends the studio's programs with it.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.39"
+windows-core = "0.62"
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects"] }
+
+[dev-dependencies]
+tempfile = "3.27.0"
+tokio = { version = "1", features = ["rt-multi-thread", "test-util"] }

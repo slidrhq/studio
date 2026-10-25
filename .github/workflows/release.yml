@@ -1,0 +1,119 @@
+# A release of Slidr Studio, as the app releases (slidrhq/app, .github/workflows/release.yml):
+# pushing a tag `v<version>` builds the Windows installer, signs it, and puts it in a draft GitHub
+# release with the `latest.json` the studio's updater reads (src-tauri/src/updates.rs). The updater
+# sees a release only once it is published, so the draft is the last check.
+#
+# Two signatures:
+# - Authenticode, with the project's certificate from Certum, so Windows trusts what it runs.
+#   `tauri build` signs the studio's exe, the uninstaller and the installer with it
+#   (scripts/sign-windows.mjs). The certificate's key is in Certum's cloud and only SimplySign
+#   Desktop, logged in with a code from the phone, opens it. No runner of GitHub's can, so the job
+#   runs on the author's machine: a self-hosted runner with the label `slidr-signing`, registered
+#   for this repository (or for the organization) beside the app's.
+# - The updater's, with the studio's own key, whose public half is in tauri.conf.json
+#   (TAURI_SIGNING_PRIVATE_KEY, and TAURI_SIGNING_PRIVATE_KEY_PASSWORD when it has one). It is made
+#   last, over the signed installer, since signing changes the bytes.
+#
+# To release: log in to SimplySign Desktop, start the runner as yourself (`run.cmd` in its folder;
+# the certificate is in your own store, which a service of another account does not see), then
+# `pnpm release`. A job waits in the queue until the runner is up. The repository is public and a
+# job on the runner runs as you, so keep the runner up only while a release is made, and have
+# workflows of outside contributors wait for approval (Settings → Actions → General).
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: [self-hosted, windows, slidr-signing]
+    timeout-minutes: 90
+    env:
+      # Named, the certificate must sign: a build that cannot fails instead of going out unsigned.
+      SLIDR_SIGN_CERT: 5C64DAC774694B59FE6427A4744A3434DDCC49F1
+    defaults:
+      run:
+        shell: bash
+    steps:
+      # Before the build, so a runner that cannot sign fails at once. The runner is the author's
+      # own machine, so the job builds with the Rust installed there and pnpm's warm store: the
+      # toolchain and cache actions would update the author's Rust and prune the cargo registry.
+      - name: This machine signs
+        shell: powershell
+        run: |
+          if (-not (Test-Path "Cert:\CurrentUser\My\$env:SLIDR_SIGN_CERT")) {
+            Write-Output "::error::The certificate is not in the store of $env:USERNAME. Is SimplySign Desktop logged in, and does the runner run as you?"
+            exit 1
+          }
+          # bash is Git's, not the launcher of WSL that Windows keeps in System32.
+          Join-Path (Split-Path (Split-Path (Get-Command git).Source)) bin | Add-Content $env:GITHUB_PATH
+
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: The tag names the version of the studio
+        run: |
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::The tag is $GITHUB_REF_NAME, the studio is $version"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - run: pnpm install --frozen-lockfile
+
+      # The prompts are the app's: the file the binary carries is what vendor/ holds.
+      - run: pnpm instructions:check
+
+      # The build signs with Authenticode as it goes, and makes no signature of the updater's (no
+      # `createUpdaterArtifacts`), so a build on any machine needs no key; it is made below.
+      - name: Build
+        run: pnpm tauri build
+
+      # Without the space of the product's name: GitHub would put a dot in its place, and
+      # latest.json would name a file the release does not have.
+      - name: Collect the installer
+        run: |
+          mkdir -p out
+          cp "target/release/bundle/nsis/Slidr Studio_${VERSION}_x64-setup.exe" "out/Slidr-Studio_${VERSION}_x64-setup.exe"
+
+      - name: Sign for the updater
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: pnpm tauri signer sign "$PWD/out/Slidr-Studio_${VERSION}_x64-setup.exe"
+
+      - name: Write latest.json
+        run: |
+          node -e '
+            const fs = require("fs");
+            const { VERSION, GITHUB_REPOSITORY, GITHUB_REF_NAME } = process.env;
+            const file = `Slidr-Studio_${VERSION}_x64-setup.exe`;
+            fs.writeFileSync("out/latest.json", JSON.stringify({
+              version: VERSION,
+              pub_date: new Date().toISOString(),
+              platforms: {
+                "windows-x86_64": {
+                  signature: fs.readFileSync(`out/${file}.sig`, "utf8").trim(),
+                  url: `https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${file}`,
+                },
+              },
+            }, null, 2));
+          '
+
+      - name: Draft the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" --draft --title "Slidr Studio $VERSION" --generate-notes \
+            "out/Slidr-Studio_${VERSION}_x64-setup.exe" \
+            "out/Slidr-Studio_${VERSION}_x64-setup.exe.sig" \
+            out/latest.json

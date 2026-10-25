@@ -1,8 +1,12 @@
 /**
- * The studio's state, as the server keeps it, and the calls that change it. The server pushes
- * every change over server-sent events; a page that reconnects reads the whole state again.
+ * The studio's state, as the studio's Rust side keeps it (src-tauri), and the commands that
+ * change it. Rust sends every change as a `studio` event; the window reads the whole state once
+ * it listens. A variant's files (its picture, its renders) are read through the `studio:`
+ * protocol (src-tauri/src/files.rs).
  */
 import { BASE_LANGUAGES, languagesOf } from '@slidr/model';
+import { convertFileSrc, invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { useSyncExternalStore } from 'react';
 import type { DesignResult, Lang } from './design';
 import type { TemplateResult } from './template';
@@ -28,7 +32,7 @@ export function languagesOfVariant(variant: Variant, result?: DesignResult): Lan
 
 /**
  * What a request makes: designs for the gallery, or the sample of a built-in template in
- * languages. `auto` is a request in words that the server is still reading; it becomes one of
+ * languages. `auto` is a request in words that the studio is still reading; it becomes one of
  * the two. A request from before there were kinds is a design.
  */
 export type RequestKind = 'design' | 'template' | 'auto';
@@ -54,7 +58,7 @@ export interface StudioRequest {
   /** A template request's template, and what the person asked beyond writing it. */
   templateId?: string;
   instructions?: string;
-  /** How the server read a request in words. */
+  /** How the studio read a request in words. */
   route?: { kind: string; reason: string };
   variantIds: string[];
   error: string | null;
@@ -162,7 +166,8 @@ export interface ProgramStatus {
 
 export interface ServerStatus {
   programs: ProgramStatus[];
-  media: { dir: string; exists: boolean; url: string };
+  /** The author copy of the library, when one is named; and the published library. */
+  media: { dir: string | null; exists: boolean; url: string };
   cloudflare: { accountId: string; token: boolean };
   /** Slidr Library, whose upload API takes the approved work, and whether the studio has its key. */
   library: { url: string; key: boolean };
@@ -219,34 +224,21 @@ function set(next: Partial<State>) {
   for (const listener of listeners) listener();
 }
 
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-  });
-  if (!response.ok) {
-    let detail = `${response.status}`;
-    try {
-      const body = (await response.json()) as { detail?: unknown };
-      if (body.detail)
-        detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail);
-    } catch {
-      // Not JSON: the status says enough.
-    }
-    throw new Error(detail);
+/** A command of the studio; a refusal is its reason, in words. */
+async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  try {
+    return await invoke<T>(command, args);
+  } catch (error) {
+    throw new Error(typeof error === 'string' ? error : JSON.stringify(error), { cause: error });
   }
-  return (await response.json()) as T;
 }
-
-const post = <T = unknown>(path: string, body: unknown = {}) =>
-  call<T>(path, { method: 'POST', body: JSON.stringify(body) });
 
 async function load() {
   const data = await call<{
     requests: StudioRequest[];
     variants: Variant[];
     publish: PublishState;
-  }>('/api/state');
+  }>('studio_state');
   set({
     requests: data.requests,
     variants: Object.fromEntries(data.variants.map((variant) => [variant.id, variant])),
@@ -255,33 +247,44 @@ async function load() {
   });
 }
 
-let source: EventSource | undefined;
+type StudioEvent =
+  | { type: 'request'; request: StudioRequest }
+  | { type: 'requestDeleted'; id: string }
+  | { type: 'variant'; variant: Variant }
+  | { type: 'publish'; publish: PublishState };
+
+let listening = false;
 
 function connect() {
-  if (source) return;
-  source = new EventSource('/api/events');
-  source.onopen = () => {
-    set({ connected: true });
-    void load();
-  };
-  source.onerror = () => set({ connected: false });
-  source.onmessage = (message: MessageEvent<string>) => {
-    const event = JSON.parse(message.data) as
-      | { type: 'request'; request: StudioRequest }
-      | { type: 'requestDeleted'; id: string }
-      | { type: 'variant'; variant: Variant }
-      | { type: 'publish'; publish: PublishState };
-    if (event.type === 'request') {
-      const others = state.requests.filter((request) => request.id !== event.request.id);
-      set({ requests: [...others, event.request].sort((a, b) => a.createdAt - b.createdAt) });
-    } else if (event.type === 'requestDeleted') {
-      set({ requests: state.requests.filter((request) => request.id !== event.id) });
-    } else if (event.type === 'variant') {
-      set({ variants: { ...state.variants, [event.variant.id]: event.variant } });
-    } else {
-      set({ publish: event.publish });
-    }
-  };
+  if (listening) return;
+  listening = true;
+  void listen<StudioEvent>('studio', ({ payload }) => receive(payload)).then(
+    () => {
+      set({ connected: true });
+      void load();
+    },
+    () => set({ connected: false }),
+  );
+  // Slidr Library opens a request and a variant here (src-tauri/src/local_server.rs).
+  void listen<{ tab?: string | null; v?: string | null }>('open', ({ payload }) => {
+    const params = new URLSearchParams();
+    if (payload.tab) params.set('tab', payload.tab);
+    if (payload.v) params.set('v', payload.v);
+    location.hash = `#${params}`;
+  });
+}
+
+function receive(event: StudioEvent) {
+  if (event.type === 'request') {
+    const others = state.requests.filter((request) => request.id !== event.request.id);
+    set({ requests: [...others, event.request].sort((a, b) => a.createdAt - b.createdAt) });
+  } else if (event.type === 'requestDeleted') {
+    set({ requests: state.requests.filter((request) => request.id !== event.id) });
+  } else if (event.type === 'variant') {
+    set({ variants: { ...state.variants, [event.variant.id]: event.variant } });
+  } else {
+    set({ publish: event.publish });
+  }
 }
 
 export function useStudio(): State {
@@ -298,10 +301,9 @@ export function useStudio(): State {
 /* ---------------------------------------------------------------- calls */
 
 export const api = {
-  status: () => call<ServerStatus>('/api/status'),
-  library: (fresh = false) => call<LibraryInfo>(`/api/library${fresh ? '?fresh=true' : ''}`),
-  templates: (fresh = false) =>
-    call<{ templates: TemplateInfo[] }>(`/api/templates${fresh ? '?fresh=true' : ''}`),
+  status: () => call<ServerStatus>('studio_status'),
+  library: (fresh = false) => call<LibraryInfo>('library_known', { fresh }),
+  templates: (fresh = false) => call<{ templates: TemplateInfo[] }>('template_listing', { fresh }),
   newRequest: (body: {
     kind: RequestKind;
     prompt: string;
@@ -312,28 +314,30 @@ export const api = {
     effort: string;
     reviewRounds: number;
     languages: Lang[];
-  }) => post<StudioRequest>('/api/requests', body),
-  more: (rid: string, count: number) => post(`/api/requests/${rid}/more`, { count }),
-  cancelRequest: (rid: string) => post(`/api/requests/${rid}/cancel`),
-  deleteRequest: (rid: string) => call(`/api/requests/${rid}`, { method: 'DELETE' }),
-  retry: (vid: string) => post(`/api/variants/${vid}/retry`),
-  cancel: (vid: string) => post(`/api/variants/${vid}/cancel`),
-  refine: (vid: string, feedback: string) => post(`/api/variants/${vid}/refine`, { feedback }),
-  newImage: (vid: string, instruction: string) =>
-    post(`/api/variants/${vid}/image`, { instruction }),
-  approve: (vid: string, value: boolean) => post(`/api/variants/${vid}/approve`, { value }),
-  discard: (vid: string, value: boolean) => post(`/api/variants/${vid}/discard`, { value }),
-  prepare: (variantIds?: string[]) =>
-    post('/api/publish/prepare', { variantIds: variantIds ?? null }),
-  confirm: () => post('/api/publish/confirm'),
-  cancelPublish: () => post('/api/publish/cancel'),
+  }) => call<StudioRequest>('request_new', { body }),
+  more: (rid: string, count: number) => call('request_more', { rid, count }),
+  cancelRequest: (rid: string) => call('request_cancel', { rid }),
+  deleteRequest: (rid: string) => call('request_delete', { rid }),
+  retry: (vid: string) => call('variant_retry', { vid }),
+  cancel: (vid: string) => call('variant_cancel', { vid }),
+  refine: (vid: string, feedback: string) => call('variant_refine', { vid, feedback }),
+  newImage: (vid: string, instruction: string) => call('variant_image', { vid, instruction }),
+  approve: (vid: string, value: boolean) => call('variant_approve', { vid, value }),
+  discard: (vid: string, value: boolean) => call('variant_discard', { vid, value }),
+  prepare: (variantIds?: string[]) => call('publish_prepare', { variantIds: variantIds ?? null }),
+  confirm: () => call('publish_confirm'),
+  cancelPublish: () => call('publish_cancel'),
   upload: (variantIds?: string[]) =>
-    post<{ items: UploadItem[] }>('/api/upload', { variantIds: variantIds ?? null }),
+    call<{ items: UploadItem[] }>('library_upload', { variantIds: variantIds ?? null }),
   librarySettings: (key: string, url = '') =>
-    post<{ url: string; key: boolean }>('/api/settings/library', { key, url }),
+    call<{ url: string; key: boolean }>('library_settings', { key, url }),
   cloudflare: (token: string, accountId: string) =>
-    post<{ accountId: string; token: boolean }>('/api/settings/cloudflare', { token, accountId }),
+    call<{ accountId: string; token: boolean }>('cloudflare_settings', { token, accountId }),
 };
+
+/** A file of a variant's working folder, through the studio's `studio:` protocol. */
+export const fileUrl = (vid: string, path: string, revision?: number) =>
+  convertFileSrc(`${vid}/${path}`, 'studio') + (revision === undefined ? '' : `?r=${revision}`);
 
 /* ---------------------------------------------------------------- renders */
 
@@ -344,7 +348,7 @@ export function renderResult(vid: string, revision: number): Promise<DesignResul
   const key = `${vid}:${revision}`;
   let pending = results.get(key);
   if (!pending) {
-    pending = call<DesignResult>(`/api/variants/${vid}/result`);
+    pending = call<DesignResult>('variant_result', { vid });
     pending.catch(() => results.delete(key));
     results.set(key, pending);
   }
@@ -352,13 +356,13 @@ export function renderResult(vid: string, revision: number): Promise<DesignResul
 }
 
 export const pictureUrl = (variant: Variant) =>
-  `/api/variants/${variant.id}/files/subject.png?r=${variant.render?.imageRevision ?? variant.imageRevision}`;
+  fileUrl(variant.id, 'subject.png', variant.render?.imageRevision ?? variant.imageRevision);
 
 export const isTemplate = (variant: Variant) => variant.kind === 'template';
 
 /** A picture of a template variant's last render: `sheet`, `s01-full`, `s01-thumb`… */
 export const renderPicture = (variant: Variant, name: string) =>
-  `/api/variants/${variant.id}/files/renders/r${variant.render?.revision ?? 0}/${name}.png`;
+  fileUrl(variant.id, `renders/r${variant.render?.revision ?? 0}/${name}.png`);
 
 const templateResults = new Map<string, Promise<TemplateResult>>();
 
@@ -367,7 +371,7 @@ export function templateResult(vid: string, revision: number): Promise<TemplateR
   const key = `${vid}:${revision}`;
   let pending = templateResults.get(key);
   if (!pending) {
-    pending = call<TemplateResult>(`/api/variants/${vid}/result`);
+    pending = call<TemplateResult>('variant_result', { vid });
     pending.catch(() => templateResults.delete(key));
     templateResults.set(key, pending);
   }

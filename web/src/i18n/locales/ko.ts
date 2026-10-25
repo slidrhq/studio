@@ -3,7 +3,7 @@ import type { MessageKey } from '../catalog';
 const words: Record<MessageKey, string> = {
   'shell.subtitle': '라이브러리용 완성 디자인과 템플릿 샘플 · Claude, Codex, Cloudflare',
   'shell.mediaCopyMissing': '라이브러리 사본',
-  'shell.disconnected': '서버와 연결이 끊어짐',
+  'shell.disconnected': '스튜디오와 연결되지 않음',
   'shell.displayLanguage': '표시 언어',
   'shell.publishing': '게시 중…',
   'shell.publish': '게시',
@@ -57,7 +57,7 @@ const words: Record<MessageKey, string> = {
     '승인된 각 디자인은 슬라이드, 이름, 검색 태그와 함께 새 디자인으로 미디어 라이브러리의 업로드 API에 전송되고, 각 샘플은 해당 템플릿의 다른 언어판으로 전송됩니다. 라이브러리는 게시된 내용과 대조해 확인하고 편집자가 승인할 때까지 보관하며, 게시는 거기서 이루어집니다.',
   'publish.keyTitle': '미디어 라이브러리 키',
   'publish.keyHelp':
-    '미디어 라이브러리 API에 대한 스튜디오의 키: Worker의 LIBRARY_KEYS에 있는 studio=<key>. 이 서버의 메모리에만 보관됩니다.',
+    '미디어 라이브러리 API에 대한 스튜디오의 키: Worker의 LIBRARY_KEYS에 있는 studio=<key>. 이 컴퓨터의 Windows 자격 증명 관리자에 보관됩니다.',
   'publish.upload': '{count}개를 미디어 라이브러리로 보내기',
   'publish.waiting': '미디어 라이브러리에서 대기 중:',
   'publish.refused': '미디어 라이브러리가 받지 않았습니다: {error}',

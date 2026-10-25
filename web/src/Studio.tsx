@@ -11,9 +11,11 @@ import { VariantDetail } from './VariantDetail';
 /**
  * The browser of the published library, Slidr Library (github.com/slidrhq/library), where the
  * studio's published work can be seen as every installed app reads it (`VITE_SLIDR_LIBRARY_URL`).
+ * It opens in the system's browser.
  */
 const LIBRARY_URL =
-  (import.meta.env.VITE_SLIDR_LIBRARY_URL as string | undefined) ?? 'http://127.0.0.1:5176/';
+  (import.meta.env.VITE_SLIDR_LIBRARY_URL as string | undefined) ??
+  'https://library.slidr.workers.dev/';
 
 const NEW = 'new';
 
@@ -49,7 +51,7 @@ function Programs({ status }: { status?: ServerStatus }) {
           {program.ready ? '●' : '○'} {program.name}
         </span>
       ))}
-      {!status.media.exists && (
+      {status.media.dir && !status.media.exists && (
         <span className="chip bad" title={status.media.dir}>
           ○ {t('shell.mediaCopyMissing')}
         </span>

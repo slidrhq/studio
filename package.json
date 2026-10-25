@@ -11,15 +11,22 @@
   "scripts": {
     "dev": "pnpm --filter @slidr/studio-web dev",
     "build": "pnpm --filter @slidr/studio-web build",
+    "tauri": "tauri",
     "typecheck": "pnpm --filter @slidr/studio-web typecheck",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check",
+    "instructions": "node web/tools/instructions.mjs --write",
+    "instructions:check": "node web/tools/instructions.mjs --check",
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm instructions:check",
+    "check:rust": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
+    "check:all": "pnpm check && pnpm check:rust",
+    "release": "node release.mjs",
     "vendor": "node scripts/vendor.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@tauri-apps/cli": "^2.12.1",
     "eslint": "^10.11.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "globals": "^17.13.0",

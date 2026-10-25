@@ -4,7 +4,7 @@ const words: Record<MessageKey, string> = {
   'shell.subtitle':
     'Готовые дизайны и примеры шаблонов для библиотеки · Claude, Codex и Cloudflare',
   'shell.mediaCopyMissing': 'Копия библиотеки',
-  'shell.disconnected': 'Нет связи с сервером',
+  'shell.disconnected': 'Нет связи со студией',
   'shell.displayLanguage': 'Язык интерфейса',
   'shell.publishing': 'Публикация…',
   'shell.publish': 'Опубликовать',
@@ -58,7 +58,7 @@ const words: Record<MessageKey, string> = {
     'Каждый одобренный дизайн отправляется в API загрузок медиатеки как новый дизайн — со слайдами, названиями и тегами для поиска; каждый образец — как его шаблон на другом языке. Медиатека проверяет его по тому, что она публикует, и хранит, пока редактор его не примет; оттуда он публикуется.',
   'publish.keyTitle': 'Ключ медиатеки',
   'publish.keyHelp':
-    'Ключ студии к API медиатеки: studio=<key> в LIBRARY_KEYS её Worker. Хранится только в памяти этого сервера.',
+    'Ключ студии к API медиатеки: studio=<key> в LIBRARY_KEYS её Worker. Хранится в диспетчере учётных данных Windows на этом компьютере.',
   'publish.upload': 'Отправить в медиатеку: {count}',
   'publish.waiting': 'Ждёт в медиатеке как',
   'publish.refused': 'Медиатека его не приняла: {error}',

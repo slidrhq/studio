@@ -1,10 +1,11 @@
 pnpm-lock.yaml
 dist/
 
-# The server's Python environment, and the studio's local requests and renders.
-server/.venv/
-server/.pytest_cache/
+# The studio's local requests and renders, Rust's builds, and what Tauri and the app's code write.
 .data*/
+target/
+src-tauri/gen/
+src-tauri/instructions.json
 
 # The app's code, copied as it is (vendor/README.md).
 vendor/

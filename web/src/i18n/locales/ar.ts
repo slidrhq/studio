@@ -3,7 +3,7 @@ import type { MessageKey } from '../catalog';
 const words: Record<MessageKey, string> = {
   'shell.subtitle': 'تصاميم جاهزة ونماذج قوالب لمكتبة الوسائط · Claude وCodex وCloudflare',
   'shell.mediaCopyMissing': 'نسخة المكتبة',
-  'shell.disconnected': 'انقطع الاتصال بالخادم',
+  'shell.disconnected': 'لا اتصال بالاستوديو',
   'shell.displayLanguage': 'لغة العرض',
   'shell.publishing': 'جارٍ النشر…',
   'shell.publish': 'نشر',
@@ -57,7 +57,7 @@ const words: Record<MessageKey, string> = {
     'يُرسَل كل تصميم معتمد إلى واجهة الرفع في المكتبة كتصميم جديد، مع شرائحه وأسمائه ووسوم البحث الخاصة به، وكل عينة كقالبها بلغة إضافية. تفحصه المكتبة مقابل ما تنشره وتحتفظ به حتى يقبله محرر، ومن هناك يُنشر.',
   'publish.keyTitle': 'مفتاح المكتبة',
   'publish.keyHelp':
-    'مفتاح الاستوديو لواجهة المكتبة: ⁦studio=<key>⁩ في ⁦LIBRARY_KEYS⁩ الخاص بـ Worker. يُحفظ في ذاكرة هذا الخادم فقط.',
+    'مفتاح الاستوديو لواجهة المكتبة: ⁦studio=<key>⁩ في ⁦LIBRARY_KEYS⁩ الخاص بـ Worker. يُحفظ في مدير بيانات الاعتماد في Windows على هذا الحاسوب.',
   'publish.upload': 'إرسال {count} إلى المكتبة',
   'publish.waiting': 'ينتظر في المكتبة باسم',
   'publish.refused': 'لم تقبله المكتبة: {error}',

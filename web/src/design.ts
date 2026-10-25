@@ -125,22 +125,20 @@ function blankPicture(width: number, height: number): Promise<Blob> {
 
 declare global {
   interface Window {
-    /** Set by the headless browser: a real picture of a region of the page, as base64 PNG. */
+    /** Set by the render page in its window: a real picture of a region of the page, as PNG. */
     __slidrCapture?: (rect: {
       x: number;
       y: number;
       width: number;
       height: number;
-    }) => Promise<string>;
+    }) => Promise<ArrayBuffer>;
   }
 }
 
-/** Pictures of the page for the engine's fidelity guard: real ones in the headless browser. */
+/** Pictures of the page for the engine's fidelity guard: real ones in a render window. */
 async function capture(rect: { x: number; y: number; width: number; height: number }) {
   if (!window.__slidrCapture) return blankPicture(rect.width, rect.height);
-  const base64 = await window.__slidrCapture(rect);
-  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-  return new Blob([bytes], { type: 'image/png' });
+  return new Blob([await window.__slidrCapture(rect)], { type: 'image/png' });
 }
 
 /** Assets the conversion stored: pictures other than the subject, which a design may not have. */
@@ -403,7 +401,7 @@ const listOf = (langs: readonly Lang[]) => {
 
 /**
  * Converts and checks a design in each of its languages: `languages` (the request's, which the
- * server sends), else those `html` has; Hebrew and English always.
+ * studio sends), else those `html` has; Hebrew and English always.
  */
 export async function convertDesign(input: {
   designId: string;

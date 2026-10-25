@@ -9,9 +9,10 @@ export default tseslint.config(
     ignores: [
       '**/node_modules/**',
       '**/dist/**',
-      // The server's Python environment, and the studio's local requests and renders.
-      'server/.venv/**',
+      // The studio's local requests and renders, and Rust's builds.
       '.data*/**',
+      'target/**',
+      'src-tauri/**',
       // The app's code, copied as it is (vendor/README.md).
       'vendor/**',
     ],
@@ -42,13 +43,13 @@ export default tseslint.config(
   },
 
   {
-    files: ['*.config.{js,ts}', '**/*.config.{js,ts}', 'scripts/**/*.mjs'],
+    files: [
+      '*.config.{js,ts}',
+      '**/*.config.{js,ts}',
+      '*.mjs',
+      'scripts/**/*.mjs',
+      'web/tools/**/*.mjs',
+    ],
     languageOptions: { globals: globals.node },
-  },
-
-  // The studio's tools: Node, and a headless browser driven from it.
-  {
-    files: ['web/tools/**/*.mjs'],
-    languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
 );

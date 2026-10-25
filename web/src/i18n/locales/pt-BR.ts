@@ -4,7 +4,7 @@ const words: Record<MessageKey, string> = {
   'shell.subtitle':
     'Designs prontos e exemplos de modelos para a biblioteca · Claude, Codex e Cloudflare',
   'shell.mediaCopyMissing': 'Cópia da biblioteca',
-  'shell.disconnected': 'Desconectado do servidor',
+  'shell.disconnected': 'Sem conexão com o estúdio',
   'shell.displayLanguage': 'Idioma de exibição',
   'shell.publishing': 'Publicando…',
   'shell.publish': 'Publicar',
@@ -58,7 +58,7 @@ const words: Record<MessageKey, string> = {
     'Cada design aprovado vai para a API de envios da biblioteca como um design novo, com seus slides, nomes e tags de busca; cada amostra, como seu modelo em outro idioma. A biblioteca o confere com o que publica e o guarda até que um editor o aceite; a partir daí ele é publicado.',
   'publish.keyTitle': 'A chave da biblioteca',
   'publish.keyHelp':
-    'A chave do estúdio para a API da biblioteca: studio=<key> em LIBRARY_KEYS do Worker dela. Fica apenas na memória deste servidor.',
+    'A chave do estúdio para a API da biblioteca: studio=<key> em LIBRARY_KEYS do Worker dela. Fica no Gerenciador de Credenciais do Windows deste computador.',
   'publish.upload': 'Enviar {count} para a biblioteca',
   'publish.waiting': 'Aguardando na biblioteca como',
   'publish.refused': 'A biblioteca não o aceitou: {error}',

@@ -9,7 +9,7 @@ export const he = {
     'כל עיצוב מאושר נשלח ל-API ההעלאות של הספרייה כעיצוב חדש, עם השקפים, השמות ותגיות החיפוש שלו, וכל דוגמה נשלחת כתבנית שלה בשפה נוספת. הספרייה בודקת אותו מול מה שהיא מפרסמת ושומרת אותו עד שעורך מאשר אותו, ומשם הוא מתפרסם.',
   'publish.keyTitle': 'המפתח של הספרייה',
   'publish.keyHelp':
-    'המפתח של הסטודיו ל-API של הספרייה: ⁦studio=<key>⁩ ב-⁦LIBRARY_KEYS⁩ של ה-Worker שלה. נשמר רק בזיכרון של השרת הזה.',
+    'המפתח של הסטודיו ל-API של הספרייה: ⁦studio=<key>⁩ ב-⁦LIBRARY_KEYS⁩ של ה-Worker שלה. נשמר במנהל האישורים של Windows במחשב הזה.',
   'publish.upload': 'שליחת {count} לספרייה',
   'publish.waiting': 'ממתין בספרייה בתור',
   'publish.refused': 'הספרייה לא קיבלה אותו: {error}',
@@ -27,7 +27,7 @@ export const en: typeof he = {
     "Each approved design goes to the library's upload API as a new design, with its slides, its names and its search tags; each sample as its template in another language. The library checks it against what it publishes and keeps it until an editor accepts it; it is published from there.",
   'publish.keyTitle': "The library's key",
   'publish.keyHelp':
-    "The studio's key to the library's API: studio=<key> in its Worker's LIBRARY_KEYS. Kept in this server's memory only.",
+    "The studio's key to the library's API: studio=<key> in its Worker's LIBRARY_KEYS. Kept in Windows' Credential Manager on this computer.",
   'publish.upload': 'Send {count} to the library',
   'publish.waiting': 'Waits in the library as',
   'publish.refused': 'The library did not take it: {error}',

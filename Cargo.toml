@@ -1,0 +1,18 @@
+[workspace]
+resolver = "3"
+members = ["src-tauri"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.90"
+license = "AGPL-3.0-only"
+
+[workspace.lints.rust]
+# `deny`, not `forbid`: the pictures of a render window are taken through WebView2 over COM, and
+# the programs the studio starts are tied to it by a job object of Win32; both take `unsafe`.
+# Their two modules carry an explicit `#[allow(unsafe_code)]`; nothing else may.
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+unwrap_used = "warn"

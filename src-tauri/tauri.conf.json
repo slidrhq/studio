@@ -1,0 +1,50 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Slidr Studio",
+  "version": "0.1.0",
+  "identifier": "slidr.studio",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://127.0.0.1:5175",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../web/dist"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": {
+        "default-src": "'self'",
+        "script-src": "'self' 'wasm-unsafe-eval'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data: blob: studio: http://studio.localhost media: http://media.localhost https://slidr-media.pages.dev",
+        "font-src": "'self' data: blob: media: http://media.localhost https://slidr-media.pages.dev",
+        "media-src": "'self' data: blob: studio: http://studio.localhost",
+        "connect-src": "'self' data: blob: ipc: http://ipc.localhost studio: http://studio.localhost media: http://media.localhost https://slidr-media.pages.dev",
+        "frame-src": "'self' data: blob:",
+        "worker-src": "'self' blob:",
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'"
+      },
+      "dangerousDisableAssetCspModification": ["style-src"]
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Slidr",
+    "shortDescription": "Slidr Studio",
+    "longDescription": "The content of Slidr's media library, made with Claude Code and Codex.",
+    "windows": {
+      "signCommand": { "cmd": "node", "args": ["../scripts/sign-windows.mjs", "%1"] }
+    },
+    "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.ico"]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRFMTRBOEVEMDI5RDFCMjUKUldRbEc1MEM3YWdVVG1KVXFNZDFEeGVuQjVrcWM2YXk3MHlzUWZML1o4MEtjdVhuVFhaZFdGZTAK",
+      "endpoints": ["https://github.com/slidrhq/studio/releases/latest/download/latest.json"],
+      "windows": { "installMode": "quiet" }
+    }
+  }
+}

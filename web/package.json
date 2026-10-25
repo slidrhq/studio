@@ -16,6 +16,7 @@
     "@slidr/model": "workspace:*",
     "@slidr/renderer": "workspace:*",
     "@slidr/templates": "workspace:*",
+    "@tauri-apps/api": "^2.12.1",
     "react": "^19.3.0",
     "react-dom": "^19.3.0"
   },
@@ -24,7 +25,6 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.1",
-    "playwright": "1.63.0",
     "typescript": "~6.0.3",
     "vite": "^8.3.2"
   }

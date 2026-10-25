@@ -4,7 +4,7 @@ const words: Record<MessageKey, string> = {
   'shell.subtitle':
     'Desain siap pakai dan contoh templat untuk pustaka · Claude, Codex, dan Cloudflare',
   'shell.mediaCopyMissing': 'Salinan pustaka',
-  'shell.disconnected': 'Terputus dari server',
+  'shell.disconnected': 'Tidak terhubung ke studio',
   'shell.displayLanguage': 'Bahasa tampilan',
   'shell.publishing': 'Menerbitkan…',
   'shell.publish': 'Terbitkan',
@@ -58,7 +58,7 @@ const words: Record<MessageKey, string> = {
     'Setiap desain yang disetujui dikirim ke API unggahan pustaka sebagai desain baru, dengan slide, nama, dan tag pencariannya; setiap contoh sebagai templatnya dalam bahasa lain. Pustaka memeriksanya terhadap apa yang diterbitkannya dan menyimpannya sampai editor menerimanya; dari sana desain itu diterbitkan.',
   'publish.keyTitle': 'Kunci pustaka',
   'publish.keyHelp':
-    'Kunci studio untuk API pustaka: studio=<key> di LIBRARY_KEYS Worker-nya. Hanya disimpan di memori server ini.',
+    'Kunci studio untuk API pustaka: studio=<key> di LIBRARY_KEYS Worker-nya. Disimpan di Credential Manager Windows di komputer ini.',
   'publish.upload': 'Kirim {count} ke pustaka',
   'publish.waiting': 'Menunggu di pustaka sebagai',
   'publish.refused': 'Pustaka tidak menerimanya: {error}',

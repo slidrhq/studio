@@ -4,7 +4,7 @@ const words: Record<MessageKey, string> = {
   'shell.subtitle':
     'Kütüphane için hazır tasarımlar ve şablon örnekleri · Claude, Codex ve Cloudflare',
   'shell.mediaCopyMissing': 'Kütüphane kopyası',
-  'shell.disconnected': 'Sunucuyla bağlantı kesildi',
+  'shell.disconnected': 'Stüdyoya bağlı değil',
   'shell.displayLanguage': 'Görüntüleme dili',
   'shell.publishing': 'Yayınlanıyor…',
   'shell.publish': 'Yayınla',
@@ -58,7 +58,7 @@ const words: Record<MessageKey, string> = {
     "Onaylanan her tasarım, slaytları, adları ve arama etiketleriyle birlikte yeni bir tasarım olarak kütüphanenin yükleme API'sine gider; her örnek, şablonunun başka bir dildeki hâli olarak. Kütüphane onu yayınladıklarıyla karşılaştırarak denetler ve bir editör kabul edene kadar saklar; yayın oradan yapılır.",
   'publish.keyTitle': 'Kütüphanenin anahtarı',
   'publish.keyHelp':
-    "Stüdyonun kütüphane API'sine anahtarı: Worker'ının LIBRARY_KEYS değerindeki studio=<key>. Yalnızca bu sunucunun belleğinde tutulur.",
+    "Stüdyonun kütüphane API'sine anahtarı: Worker'ının LIBRARY_KEYS değerindeki studio=<key>. Bu bilgisayarın Windows Kimlik Bilgileri Yöneticisi'nde tutulur.",
   'publish.upload': '{count} öğeyi kütüphaneye gönder',
   'publish.waiting': 'Kütüphanede şu adla bekliyor:',
   'publish.refused': 'Kütüphane kabul etmedi: {error}',

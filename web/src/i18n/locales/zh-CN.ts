@@ -3,7 +3,7 @@ import type { MessageKey } from '../catalog';
 const words: Record<MessageKey, string> = {
   'shell.subtitle': '为媒体库制作现成设计和模板示例 · Claude、Codex 与 Cloudflare',
   'shell.mediaCopyMissing': '媒体库副本',
-  'shell.disconnected': '与服务器断开连接',
+  'shell.disconnected': '未连接到工作室',
   'shell.displayLanguage': '显示语言',
   'shell.publishing': '正在发布…',
   'shell.publish': '发布',
@@ -57,7 +57,7 @@ const words: Record<MessageKey, string> = {
     '每个已批准的设计都会作为新设计发送到媒体库的上传 API，附带其幻灯片、名称和搜索标签；每个示例则作为其模板的另一种语言版本发送。媒体库会对照其已发布的内容进行检查，并保留到编辑接受为止；之后从那里发布。',
   'publish.keyTitle': '媒体库的密钥',
   'publish.keyHelp':
-    '工作室访问媒体库 API 的密钥：其 Worker 的 LIBRARY_KEYS 中的 studio=<key>。仅保存在此服务器的内存中。',
+    '工作室访问媒体库 API 的密钥：其 Worker 的 LIBRARY_KEYS 中的 studio=<key>。保存在此电脑的 Windows 凭据管理器中。',
   'publish.upload': '将 {count} 项发送到媒体库',
   'publish.waiting': '在媒体库中等待，编号',
   'publish.refused': '媒体库未接受：{error}',

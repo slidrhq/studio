@@ -4,7 +4,7 @@ const words: Record<MessageKey, string> = {
   'shell.subtitle':
     'लाइब्रेरी के लिए तैयार डिज़ाइन और टेम्पलेट के सैंपल · Claude, Codex और Cloudflare',
   'shell.mediaCopyMissing': 'लाइब्रेरी की कॉपी',
-  'shell.disconnected': 'सर्वर से कनेक्शन टूट गया',
+  'shell.disconnected': 'स्टूडियो से कनेक्शन नहीं है',
   'shell.displayLanguage': 'डिस्प्ले की भाषा',
   'shell.publishing': 'प्रकाशित हो रहा है…',
   'shell.publish': 'प्रकाशित करें',
@@ -58,7 +58,7 @@ const words: Record<MessageKey, string> = {
     'हर स्वीकृत डिज़ाइन लाइब्रेरी के अपलोड API पर नए डिज़ाइन के रूप में जाता है, अपनी स्लाइडों, नामों और खोज टैग के साथ; हर नमूना अपने टेम्पलेट के रूप में किसी दूसरी भाषा में। लाइब्रेरी उसे अपनी प्रकाशित सामग्री से जाँचती है और तब तक रखती है जब तक कोई संपादक उसे स्वीकार न करे; वहीं से वह प्रकाशित होता है।',
   'publish.keyTitle': 'लाइब्रेरी की कुंजी',
   'publish.keyHelp':
-    'लाइब्रेरी के API के लिए स्टूडियो की कुंजी: उसके Worker की LIBRARY_KEYS में studio=<key>। यह केवल इसी सर्वर की मेमोरी में रहती है।',
+    'लाइब्रेरी के API के लिए स्टूडियो की कुंजी: उसके Worker की LIBRARY_KEYS में studio=<key>। यह इस कंप्यूटर के Windows क्रेडेंशियल मैनेजर में रखी जाती है।',
   'publish.upload': '{count} लाइब्रेरी को भेजें',
   'publish.waiting': 'लाइब्रेरी में इस नाम से प्रतीक्षा में',
   'publish.refused': 'लाइब्रेरी ने इसे स्वीकार नहीं किया: {error}',

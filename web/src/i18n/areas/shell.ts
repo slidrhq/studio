@@ -1,7 +1,7 @@
 export const he = {
   'shell.subtitle': 'עיצובים מוכנים ודוגמאות של תבניות לספרייה · Claude, Codex ו-Cloudflare',
   'shell.mediaCopyMissing': 'עותק הספרייה',
-  'shell.disconnected': 'מנותק מהשרת',
+  'shell.disconnected': 'אין חיבור לסטודיו',
   'shell.displayLanguage': 'שפת התצוגה',
   'shell.publishing': 'מפרסם…',
   'shell.publish': 'פרסום',
@@ -51,7 +51,7 @@ export const en: Record<keyof typeof he, string> = {
   'shell.subtitle':
     'Ready-made designs and template samples for the library · Claude, Codex and Cloudflare',
   'shell.mediaCopyMissing': 'Library copy',
-  'shell.disconnected': 'Disconnected from the server',
+  'shell.disconnected': 'Not connected to the studio',
   'shell.displayLanguage': 'Display language',
   'shell.publishing': 'Publishing…',
   'shell.publish': 'Publish',

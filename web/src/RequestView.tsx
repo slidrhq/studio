@@ -25,13 +25,14 @@ function Badge({ variant }: { variant: Variant }) {
 }
 
 export function StatusLine({ variant }: { variant: Variant }) {
-  useT();
+  const t = useT();
   const running = isRunning(variant);
-  const stage = variant.stage ? (STAGE[variant.stage] ?? variant.stage) : undefined;
+  const known = variant.stage ? STAGE[variant.stage] : undefined;
+  const stage = known ? t(known) : (variant.stage ?? undefined);
   return (
     <span className={`status status-${variant.status}`}>
       {running && <span className="spinner" aria-hidden />}
-      {STATUS[variant.status]}
+      {t(STATUS[variant.status])}
       {stage && ` · ${stage}`}
     </span>
   );

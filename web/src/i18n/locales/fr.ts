@@ -4,7 +4,7 @@ const words: Record<MessageKey, string> = {
   'shell.subtitle':
     'Designs prêts à l’emploi et exemples de modèles pour la bibliothèque · Claude, Codex et Cloudflare',
   'shell.mediaCopyMissing': 'Copie de la bibliothèque',
-  'shell.disconnected': 'Déconnecté du serveur',
+  'shell.disconnected': 'Pas de connexion au studio',
   'shell.displayLanguage': 'Langue d’affichage',
   'shell.publishing': 'Publication…',
   'shell.publish': 'Publier',
@@ -58,7 +58,7 @@ const words: Record<MessageKey, string> = {
     'Chaque design approuvé part vers l’API de téléversement de la médiathèque comme nouveau design, avec ses diapositives, ses noms et ses mots-clés de recherche ; chaque exemple, comme son modèle dans une autre langue. La médiathèque le vérifie par rapport à ce qu’elle publie et le garde jusqu’à ce qu’un éditeur l’accepte ; il est publié à partir de là.',
   'publish.keyTitle': 'La clé de la médiathèque',
   'publish.keyHelp':
-    'La clé du studio pour l’API de la médiathèque : studio=<key> dans LIBRARY_KEYS de son Worker. Gardée uniquement en mémoire sur ce serveur.',
+    'La clé du studio pour l’API de la médiathèque : studio=<key> dans LIBRARY_KEYS de son Worker. Gardée dans le Gestionnaire d’identification de Windows de cet ordinateur.',
   'publish.upload': 'Envoyer {count} à la médiathèque',
   'publish.waiting': 'En attente dans la médiathèque sous',
   'publish.refused': 'La médiathèque ne l’a pas accepté : {error}',

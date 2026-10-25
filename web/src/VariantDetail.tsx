@@ -2,7 +2,7 @@ import { LANGUAGE_NAMES, languagesOf } from '@slidr/model';
 import { useEffect, useRef, useState } from 'react';
 import { api, isRunning, languagesOfVariant, type Lang, type Variant } from './api';
 import type { DesignResult } from './design';
-import { LOG_KIND, money, time } from './labels';
+import { LOG_KIND, LOG_PLAIN, money, time } from './labels';
 import { useT } from './i18n';
 import { LanguagePicker } from './languages';
 import { StatusLine } from './RequestView';
@@ -60,6 +60,7 @@ function Findings({ result }: { result: DesignResult }) {
 }
 
 export function Log({ variant }: { variant: Variant }) {
+  const t = useT();
   const list = useRef<HTMLOListElement>(null);
   // The list follows its newest line; the panel around it stays where the person left it.
   useEffect(() => {
@@ -67,15 +68,18 @@ export function Log({ variant }: { variant: Variant }) {
   }, [variant.log.length]);
   return (
     <ol className="log" ref={list}>
-      {variant.log.map((entry, i) => (
-        <li key={i} className={`log-${entry.kind}`}>
-          <span className="log-time">{time(entry.t)}</span>
-          <span className="tag">{LOG_KIND[entry.kind] ?? entry.kind}</span>
-          <span dir="auto" className="log-text">
-            {entry.text}
-          </span>
-        </li>
-      ))}
+      {variant.log.map((entry, i) => {
+        const kind = LOG_KIND[entry.kind];
+        return (
+          <li key={i} className={`log-${entry.kind}`}>
+            <span className="log-time">{time(entry.t)}</span>
+            <span className="tag">{kind ? t(kind) : (LOG_PLAIN[entry.kind] ?? entry.kind)}</span>
+            <span dir="auto" className="log-text">
+              {entry.text}
+            </span>
+          </li>
+        );
+      })}
     </ol>
   );
 }
