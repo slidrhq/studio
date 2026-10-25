@@ -123,6 +123,37 @@ function cleanTree(root: ParentNode): boolean {
   return changed;
 }
 
+/** An attribute of a start tag, from where the one before it ended (`/` separates them too). */
+const TAG_ATTRIBUTE = /([\s/]+)([^\s"'>/=][^\s"'>/=]*)(\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*))?/y;
+
+/**
+ * Markup with the event handler attributes (`onclick`, `onerror`, …) of its start tags left out,
+ * before it is parsed at all. The browser checks the page's content policy as such an attribute
+ * is created, even in a detached or inert document (`DOMParser`, a `<template>`), and reports
+ * every one it blocks: markup from outside (a paste, an SVG file) logged errors although nothing
+ * ran. Only start tags are read; text and attribute values are kept as they are. It is no
+ * sanitizer: what the markup parses into is still cleaned (`sanitizeMarkup`) or only read.
+ */
+export function withoutEventHandlers(markup: string): string {
+  if (!/\bon/i.test(markup)) return markup;
+  let out = '';
+  let at = 0;
+  const tag = /<[a-zA-Z][^\s/>]*/g;
+  for (let open = tag.exec(markup); open; open = tag.exec(markup)) {
+    out += markup.slice(at, open.index + open[0].length);
+    let pos = open.index + open[0].length;
+    TAG_ATTRIBUTE.lastIndex = pos;
+    for (let attr = TAG_ATTRIBUTE.exec(markup); attr; attr = TAG_ATTRIBUTE.exec(markup)) {
+      // A handler is dropped with its value; the separator before it is kept.
+      out += /^on/i.test(attr[2] ?? '') ? (attr[1] ?? '') : attr[0];
+      pos = TAG_ATTRIBUTE.lastIndex;
+    }
+    at = pos;
+    tag.lastIndex = pos;
+  }
+  return out + markup.slice(at);
+}
+
 /** Parses markup as HTML (inline SVG included) into a detached fragment of `doc`. */
 export function parseFragment(markup: string, doc: Document = document): DocumentFragment {
   const template = doc.createElement('template');

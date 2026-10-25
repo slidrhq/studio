@@ -47,3 +47,4 @@ export {
   type MasterState,
 } from './master';
 export { changeLayout } from './changeLayout';
+export { COVER_TITLE_SIZE, templateCover, type CoverOptions } from './cover';

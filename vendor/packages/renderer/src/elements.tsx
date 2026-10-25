@@ -51,7 +51,7 @@ import { frameDocument, prepareSvg, resolveAssetRefs, resolveAssetUrls } from '.
 import { parseFragment, sanitizeFragment } from './sanitize';
 import { stretchSvg } from './stretchSvg';
 import { TableView } from './table';
-import { numberedText, opensAddress, TextBox, textFillStyle } from './text';
+import { numberedText, opensAddress, TextBox, textFillStyle, textStrokeStyle } from './text';
 import { colorCss, shadowCss } from './theme';
 
 const FILL_PARENT: CSSProperties = { position: 'absolute', inset: 0, margin: 0, padding: 0 };
@@ -1331,7 +1331,11 @@ export const ElementView = memo(function ElementView({
       data-link-target={link?.target}
       // In a show an element with a link is a stop of Tab, and Enter on it follows it (UI-06).
       {...(link && ctx.mode === 'present' && !decoration ? { tabIndex: 0, role: 'link' } : {})}
-      style={{ ...boxStyle(element), ...passthroughStyle(element.css) }}
+      style={{
+        ...boxStyle(element),
+        ...passthroughStyle(element.css),
+        ...textStrokeStyle(element.css),
+      }}
     >
       {inner(element, decoration)}
     </div>

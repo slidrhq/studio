@@ -50,6 +50,7 @@ export async function renderSlideOffscreen(
     dispose();
     throw new Error('The slide did not render.');
   }
-  await settle(container.ownerDocument);
+  // The slide alone: the page around it (the editor, its panels) is not what is drawn here.
+  await settle(container);
   return { root, container, dispose };
 }

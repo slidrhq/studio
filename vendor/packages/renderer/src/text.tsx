@@ -287,6 +287,43 @@ export function readsAsNumber(dir: Paragraph['dir'], text: string, fallback: Dir
 
 const paragraphText = (p: Paragraph) => p.runs.map((r) => r.text).join('');
 
+/**
+ * Where an element keeps the width of the outline its letters have (`-webkit-text-stroke`, TXT-11),
+ * for the runs that draw a line under or through their text.
+ *
+ * Chromium draws such a line in the colour of the outline of the box that draws it, and under
+ * outlined text an underline showed as a bar of the outline's colour: a white line under dark
+ * letters with a white outline. The box that draws the line has no outline (`LINED_STYLE`), so
+ * the line is in the colour of the text, with the text's shadow, as PowerPoint draws it; the
+ * letters inside it take the element's outline back (`OUTLINED_STYLE`). The text editor draws its
+ * underline and strike marks the same way.
+ */
+export const TEXT_STROKE_WIDTH = '--slidr-text-stroke-width';
+export const LINED_STYLE: CSSProperties = { WebkitTextStrokeWidth: 0 };
+export const OUTLINED_STYLE: CSSProperties = {
+  WebkitTextStrokeWidth: `var(${TEXT_STROKE_WIDTH}, 0)`,
+};
+
+/** A value of a CSS declaration without its `!important`. */
+const bare = (value: string) => value.replace(/\s*!important\s*$/i, '').trim();
+
+/** The custom property of the width of the outline an element's `css` gives its letters. */
+export function textStrokeStyle(css: Record<string, string> | undefined): CSSProperties {
+  let width: string | undefined;
+  for (const [name, value] of Object.entries(css ?? {})) {
+    const property = name.trim().toLowerCase();
+    if (property === '-webkit-text-stroke-width') width = bare(value);
+    else if (property === '-webkit-text-stroke') {
+      // `<width> <colour>`, in either order; a colour's own parts are in parentheses.
+      width =
+        bare(value)
+          .split(/\s+(?![^(]*\))/)
+          .find((part) => /^(?:[+-]?(?:\d|\.\d)|thin$|medium$|thick$)/i.test(part)) ?? width;
+    }
+  }
+  return width ? ({ [TEXT_STROKE_WIDTH]: width } as CSSProperties) : {};
+}
+
 const LINK_STYLE: CSSProperties = { color: 'inherit', textDecoration: 'inherit' };
 
 /** A link to a slide of the deck, as the `link` mark holds it: `#slide=<slideId>` (TXT-09). */
@@ -306,7 +343,11 @@ export function opensAddress(address: string): boolean {
 
 function RunView({ run, role, ltr }: { run: Run; role: 'heading' | 'body'; ltr: boolean }) {
   const { mode, opensLink } = useRenderContext();
-  const style = runStyle(run.marks, role);
+  const marked = runStyle(run.marks, role);
+  // A line under or through the text is drawn by a box without an outline (`TEXT_STROKE_WIDTH`).
+  const lined = run.marks?.underline || run.marks?.strike;
+  const style = lined ? { ...marked, ...LINED_STYLE } : marked;
+  const text = lined ? <span style={OUTLINED_STYLE}>{run.text}</span> : run.text;
   const dir = ltr ? 'ltr' : undefined;
   const link = run.marks?.link;
   const slide = link ? SLIDE_LINK.exec(link)?.[1] : undefined;
@@ -322,7 +363,7 @@ function RunView({ run, role, ltr }: { run: Run; role: 'heading' | 'body'; ltr: 
         dir={dir}
         style={{ ...LINK_STYLE, cursor: 'pointer', ...style }}
       >
-        {run.text}
+        {text}
       </a>
     );
   }
@@ -335,16 +376,16 @@ function RunView({ run, role, ltr }: { run: Run; role: 'heading' | 'body'; ltr: 
         dir={dir}
         style={{ ...LINK_STYLE, ...style }}
       >
-        {run.text}
+        {text}
       </a>
     );
   }
   return style || ltr ? (
     <span dir={dir} style={style}>
-      {run.text}
+      {text}
     </span>
   ) : (
-    <>{run.text}</>
+    <>{text}</>
   );
 }
 
@@ -367,6 +408,9 @@ function Marker({ text, list, firstRun }: { text: string; list: ListInfo; firstR
         textIndent: 0,
         textAlign: 'start',
         textDecorationLine: 'none',
+        // The item's text spaces its lines. A marker is set in the paragraph's font, not the
+        // text's, and a font with a taller ascent or descent made every line of the list taller.
+        lineHeight: 0,
         ...(size !== undefined ? { fontSize: size } : {}),
         ...(color ? { color: colorCss(color) } : {}),
       }}

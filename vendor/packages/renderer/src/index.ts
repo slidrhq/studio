@@ -54,11 +54,14 @@ export {
   paragraphStyle,
   readsAsNumber,
   runStyle,
+  textStrokeStyle,
+  LINED_STYLE,
+  OUTLINED_STYLE,
   MARKER_EM,
   LEVEL_EM,
   type TextDefaults,
 } from './text';
-export { sanitizeMarkup } from './sanitize';
+export { sanitizeMarkup, withoutEventHandlers } from './sanitize';
 export { cleanPicture, SVG_NAMESPACE } from './picture';
 export {
   ASSET_URL_SCHEME,

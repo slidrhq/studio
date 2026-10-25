@@ -143,12 +143,14 @@ packages/templates/src/align.ts
 packages/templates/src/builtin/kit.ts
 packages/templates/src/builtin/pictures.generated.ts
 packages/templates/src/changeLayout.ts
+packages/templates/src/cover.ts
 packages/templates/src/createSlide.ts
 packages/templates/src/deck.ts
 packages/templates/src/draft.ts
 packages/templates/src/follow.ts
 packages/templates/src/index.ts
 packages/templates/src/json.ts
+packages/templates/src/letters.generated.ts
 packages/templates/src/master.ts
 packages/templates/src/mirror.ts
 packages/templates/src/objects.ts
