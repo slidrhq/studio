@@ -6,14 +6,12 @@
 //!
 //! Its approved work goes to Slidr Library's upload API (`uploads.rs`; the library's README,
 //! "Uploading"): a design as `designs: add`, a template's sample as `templates: translate`. The
-//! library checks each against what it publishes, and keeps it until an editor accepts it. A
-//! publication then writes the accepted uploads into the library, through the library's API too
-//! (`POST /api/publish`; README, "Publishing the uploads"): the library lives in its Worker's
-//! bucket, and every app reads it from there. The studio asks for one from its Publish panel, with
-//! its key, and marks the variants whose uploads it published.
+//! library checks each against what it publishes. Sent with a token that publishes, an upload is
+//! published at once, or waits in the library and says why: publishing is the library's business,
+//! and the studio only keeps each upload's status, and marks the variants whose uploads were
+//! published.
 
 use std::{
-    collections::HashSet,
     path::Path,
     sync::{Arc, Mutex, MutexGuard, PoisonError},
     time::{Duration, Instant},
@@ -38,8 +36,6 @@ pub const INDEX: &str = "elements/designs/index.json";
 /// Most search tags kept in a language, and fewest a language must have for any to be kept.
 const MOST_TAGS: usize = 20;
 const FEWEST_TAGS: usize = 3;
-/// Most uploads a publication may name.
-pub const MOST_PUBLISHED: usize = 50;
 
 fn niqqud(c: char) -> bool {
     ('\u{0591}'..='\u{05C7}').contains(&c)
@@ -358,7 +354,7 @@ impl Library {
 
     /// Sends approved work to the library's upload API (`uploads.rs`), one upload each: a design as
     /// `designs: add`, a template's sample as `templates: translate`. Each item says the upload it
-    /// now waits as, or why the library did not take it; a variant keeps its upload
+    /// is now, its status, or why the library did not take it; a variant keeps its upload
     /// (`variant.upload`), so it is not sent twice.
     pub async fn upload(&self, vids: &[String]) -> Vec<Value> {
         let api = self.api();
@@ -385,96 +381,93 @@ impl Library {
                 }
             };
             let item = match sent {
-                Ok(answer) => {
-                    let id = answer
-                        .get("id")
-                        .and_then(Value::as_str)
-                        .unwrap_or_default()
-                        .to_owned();
-                    let status = answer
-                        .get("status")
-                        .and_then(Value::as_str)
-                        .map(str::to_owned);
-                    self.store.update_variant(vid, |variant| {
-                        variant.upload = Some(Upload {
-                            id: id.clone(),
-                            status: status.clone(),
-                            at: now(),
-                        });
-                    });
-                    json!({
-                        "variantId": vid,
-                        "uploadId": id,
-                        "status": status,
-                        "missing": answer.get("missing").cloned().unwrap_or_else(|| json!([])),
-                    })
-                }
+                Ok(answer) => self.settle(vid, &answer),
                 Err((error, issues)) => json!({"variantId": vid, "error": error, "issues": issues}),
             };
             results.push(item);
         }
+        if results.iter().any(|item| item["status"] == "published") {
+            self.templates.forget().await;
+        }
         results
     }
 
-    /* -------------------------------------------------------------- into the library */
-
-    /// Where the published library is, when it was published, and how many uploads wait.
-    pub async fn state(&self) -> Result<Value, String> {
-        self.api().library().await.map_err(|e| e.message)
-    }
-
-    /// The uploads the library's editors accepted, which the next publication takes.
-    pub async fn accepted(&self) -> Result<Vec<Value>, String> {
-        self.api().accepted().await.map_err(|e| e.message)
-    }
-
-    /// Asks the library to publish its accepted uploads (or those named), and marks each variant
-    /// whose upload it published: it leaves the queue, as published.
-    pub async fn publish(&self, upload_ids: Option<&[String]>) -> Result<Value, String> {
-        let done = self
-            .api()
-            .publish(upload_ids)
-            .await
-            .map_err(|e| e.message)?;
-        let published: HashSet<&str> = items(done.get("uploads"))
-            .iter()
-            .filter_map(|upload| upload.get("id").and_then(Value::as_str))
-            .collect();
-        if !published.is_empty() {
-            let stamp = now();
-            let when = done.get("published").map_or_else(
-                || "None".to_owned(),
-                |when| crate::prompts::show(Some(when)),
-            );
-            for variant in self.store.variants() {
-                let Some(upload) = variant
-                    .upload
+    /// What the library answered of an upload, kept by its variant: its status, and when it was
+    /// published, the variant is marked published and leaves the queue. The item says the upload,
+    /// its status, and why it waits, when it does.
+    fn settle(&self, vid: &str, answer: &Value) -> Value {
+        let id = answer
+            .get("id")
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned();
+        let status = answer
+            .get("status")
+            .and_then(Value::as_str)
+            .map(str::to_owned);
+        let published = status.as_deref() == Some("published");
+        self.store.update_variant(vid, |variant| {
+            variant.upload = Some(Upload {
+                id: id.clone(),
+                status: status.clone(),
+                at: now(),
+            });
+            if published
+                && variant
+                    .published
                     .as_ref()
-                    .filter(|upload| published.contains(upload.id.as_str()))
-                else {
-                    continue;
-                };
-                let upload = Upload {
-                    status: Some("published".into()),
-                    ..upload.clone()
-                };
-                self.store.update_variant(&variant.id, |variant| {
-                    variant.upload = Some(upload);
-                    variant.published = Some(Published {
-                        at: stamp,
-                        revision: variant.revision,
-                    });
-                    variant.approved = false;
-                    variant.push_log(
-                        "publish",
-                        format!("Published to the media library ({when})."),
-                    );
+                    .is_none_or(|p| p.revision != variant.revision)
+            {
+                variant.published = Some(Published {
+                    at: now(),
+                    revision: variant.revision,
                 });
+                variant.approved = false;
+                variant.push_log("publish", "Published to the media library.");
             }
+        });
+        if published {
             *lock(&self.known) = None;
+        }
+        // Why it waits: the publication that could not run, the tries that failed, or the note of
+        // one sent back.
+        let note = [
+            answer.pointer("/publishing/failed/message"),
+            answer.pointer("/publication/message"),
+            answer.get("note"),
+        ]
+        .into_iter()
+        .flatten()
+        .find_map(Value::as_str);
+        json!({
+            "variantId": vid,
+            "uploadId": id,
+            "status": status,
+            "note": note,
+            "missing": answer.get("missing").cloned().unwrap_or_else(|| json!([])),
+        })
+    }
+
+    /// The status of the uploads these variants were sent as, as the library has them now.
+    pub async fn statuses(&self, vids: &[String]) -> Vec<Value> {
+        let api = self.api();
+        let mut results = Vec::new();
+        for vid in vids {
+            let Some(upload) = self.store.variant(vid).and_then(|variant| variant.upload) else {
+                continue;
+            };
+            let item = match api.upload(&upload.id).await {
+                Ok(answer) => self.settle(vid, &answer),
+                Err(error) => {
+                    json!({"variantId": vid, "uploadId": upload.id, "error": error.message})
+                }
+            };
+            results.push(item);
+        }
+        if results.iter().any(|item| item["status"] == "published") {
             self.templates.forget().await;
         }
-        Ok(done)
+        results
     }
 }
 
@@ -601,20 +594,28 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_publication_marks_the_variants_whose_uploads_it_published() {
+    async fn an_upload_keeps_its_status_and_a_published_one_leaves_the_queue() {
         let dir = tempfile::tempdir().expect("a folder");
-        let pages = Pages::new(&[(
-            "POST",
-            "/api/publish",
-            200,
-            json!({"published": "2026-10-21T00:00:01.000Z", "uploads": [{"id": "u-1"}],
-                   "skipped": [{"id": "u-2", "message": "It is pending."}]}),
-        )]);
-        let (library, store) = library(dir.path(), pages.clone());
+        let pages = Pages::new(&[
+            (
+                "GET",
+                "/api/uploads/u-1",
+                200,
+                json!({"id": "u-1", "status": "published"}),
+            ),
+            (
+                "GET",
+                "/api/uploads/u-2",
+                200,
+                json!({"id": "u-2", "status": "accepted",
+                       "publication": {"message": "The store could not be reached.", "attempts": 1}}),
+            ),
+        ]);
+        let (library, store) = library(dir.path(), pages);
         let request = store.create_request(Request::draft(RequestKind::Design, "x".into()));
-        let sent_upload = |id: &str, status: &str| Upload {
+        let sent_upload = |id: &str| Upload {
             id: id.into(),
-            status: Some(status.into()),
+            status: Some("pending".into()),
             at: 1.0,
         };
         let sent = store
@@ -622,32 +623,32 @@ mod tests {
             .expect("a variant");
         store.update_variant(&sent.id, |v| {
             v.approved = true;
-            v.upload = Some(sent_upload("u-1", "accepted"));
+            v.upload = Some(sent_upload("u-1"));
         });
         let other = store
             .create_variant(&request.id, design_brief(), NewVariant::default())
             .expect("a variant");
         store.update_variant(&other.id, |v| {
             v.approved = true;
-            v.upload = Some(sent_upload("u-2", "pending"));
+            v.upload = Some(sent_upload("u-2"));
         });
-        let done = library.publish(None).await.expect("published");
-        assert_eq!(done["skipped"][0]["id"], "u-2");
-        assert_eq!(pages.sent.lock().expect("the log")[0].2, b"{}");
-        // Published, it leaves the queue; the other waits as it was.
+        let items = library.statuses(&[sent.id.clone(), other.id.clone()]).await;
+        assert_eq!(items[0]["status"], "published");
+        assert_eq!(items[1]["status"], "accepted");
+        assert_eq!(items[1]["note"], "The store could not be reached.");
+        // Published, it leaves the queue; the other waits in the library, as it said.
         let sent = store.variant(&sent.id).expect("the variant");
         assert!(sent.published.is_some() && !sent.approved);
         assert_eq!(
             sent.upload.and_then(|u| u.status).as_deref(),
             Some("published")
         );
-        assert!(
-            sent.log
-                .last()
-                .is_some_and(|line| line.text.contains("2026-10-21T00:00:01.000Z"))
-        );
         let other = store.variant(&other.id).expect("the variant");
         assert!(other.approved && other.published.is_none());
+        assert_eq!(
+            other.upload.and_then(|u| u.status).as_deref(),
+            Some("accepted")
+        );
     }
 
     #[tokio::test]
@@ -660,13 +661,23 @@ mod tests {
         }
         let store = Arc::new(store(&settings.requests_dir()));
         let templates = Arc::new(Templates::new("http://127.0.0.1:9/".into()));
-        let library = Library::with(settings, store, templates, Pages::new(&[]));
-        for refused in [
-            library.state().await.err(),
-            library.accepted().await.err(),
-            library.publish(None).await.err(),
-        ] {
-            assert!(refused.is_some_and(|e| e.contains("no token")));
-        }
+        let library = Library::with(settings, store.clone(), templates, Pages::new(&[]));
+        let request = store.create_request(Request::draft(RequestKind::Design, "x".into()));
+        let variant = store
+            .create_variant(&request.id, design_brief(), NewVariant::default())
+            .expect("a variant");
+        store.update_variant(&variant.id, |v| {
+            v.upload = Some(Upload {
+                id: "u-1".into(),
+                status: None,
+                at: 1.0,
+            });
+        });
+        let items = library.statuses(&[variant.id]).await;
+        assert!(
+            items[0]["error"]
+                .as_str()
+                .is_some_and(|e| e.contains("no token"))
+        );
     }
 }

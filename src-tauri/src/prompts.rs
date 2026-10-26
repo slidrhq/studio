@@ -58,6 +58,9 @@ pub const TALLER: [&str; 2] = ["ar", "hi"];
 /// Languages a browser may break between almost any two characters.
 pub const ANY_BREAK: [&str; 3] = ["ja", "ko", "zh-CN"];
 
+/// The most concepts one plan makes, however many a request asks for.
+pub const MOST_CONCEPTS: u32 = 12;
+
 fn count_word(count: usize) -> String {
     match count {
         4 => "four".into(),
@@ -321,7 +324,7 @@ pub fn plan_schema(langs: &[String]) -> Value {
 
 pub fn plan_prompt(
     prompt: &str,
-    count: u32,
+    count: Option<u32>,
     groups: &[Group],
     taken: &[String],
     group: Option<&str>,
@@ -347,14 +350,17 @@ pub fn plan_prompt(
                  when none fits."
             .to_owned(),
     };
-    let many = if count > 1 {
-        format!(
-            "Plan {count} designs. Each must be a different concept: a different layout, focal \
-             point, typography, palette and picture, never a recolour or a retitle of another. \
-             Together they should give the person real alternatives."
-        )
-    } else {
-        "Plan one design.".to_owned()
+    let different = "Each must be a different concept: a different layout, focal point, \
+                     typography, palette and picture, never a recolour or a retitle of another. \
+                     Together they should give the person real alternatives.";
+    let many = match count {
+        None => format!(
+            "Plan as many designs as the request asks for (\"11 slides\" is eleven designs, \
+             \"a slide\" is one), but no more than {MOST_CONCEPTS}; when it names no number, \
+             plan three. {different}"
+        ),
+        Some(1) => "Plan one design.".to_owned(),
+        Some(count) => format!("Plan {count} designs. {different}"),
     };
     let composition = "Start each concept from its own composition idea, found in the occasion \
                        and its world (its objects, rituals, numbers, words, places), not from a \
@@ -814,7 +820,7 @@ pub mod tests {
 
     #[test]
     fn plan_prompt_names_the_groups_and_the_count() {
-        for count in [1, 3] {
+        for count in [Some(1), Some(3), None] {
             let groups = [Group {
                 id: "invites".into(),
                 he: Some("הזמנות".into()),
@@ -830,7 +836,11 @@ pub mod tests {
             );
             assert!(text.contains("an invitation") && text.contains("`invites`: הזמנות / Invites"));
             assert!(text.contains("m-x"));
-            assert_eq!(text.contains("Plan one design."), count == 1);
+            assert_eq!(text.contains("Plan one design."), count == Some(1));
+            assert_eq!(
+                text.contains("Plan as many designs as the request asks for"),
+                count.is_none()
+            );
             assert!(
                 text.contains(
                     "Each design is made in Hebrew and English, and in no other language."
@@ -843,7 +853,7 @@ pub mod tests {
     #[test]
     fn plan_asks_for_copy_in_every_chosen_language_and_names_in_two() {
         let chosen = langs(&["he", "en", "de", "ko"]);
-        let text = plan_prompt("a sale", 2, &[], &[], None, &chosen);
+        let text = plan_prompt("a sale", Some(2), &[], &[], None, &chosen);
         assert!(text.contains(
             "Each design is made in Hebrew, English, German and Korean, and in no other language."
         ));
@@ -877,7 +887,7 @@ pub mod tests {
             json!(["he", "en"])
         );
         assert!(
-            plan_prompt("a party", 1, &[], &[], None, &base_langs())
+            plan_prompt("a party", None, &[], &[], None, &base_langs())
                 .contains("`tags`: the words people type into the gallery's search")
         );
     }

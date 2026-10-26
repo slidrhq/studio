@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use tauri::{State, WebviewWindow, ipc::Response};
 
 use crate::{
-    languages, library,
+    languages,
     pipeline::Studio,
     programs,
     render::{self, Done, Rect, Renders},
@@ -83,8 +83,6 @@ pub struct NewRequest {
     kind: RequestKind,
     #[serde(default)]
     template_id: String,
-    #[serde(default = "three")]
-    count: u32,
     #[serde(default)]
     group: String,
     #[serde(default)]
@@ -100,10 +98,6 @@ pub struct NewRequest {
     languages: Vec<String>,
 }
 
-fn three() -> u32 {
-    3
-}
-
 fn two() -> u32 {
     2
 }
@@ -114,9 +108,6 @@ impl NewRequest {
         too_long(&self.prompt, 4000, "request")?;
         too_long(&self.template_id, 40, "template id")?;
         too_long(&self.group, 40, "group")?;
-        if !(1..=6).contains(&self.count) {
-            return Err("Plan 1 to 6 concepts.".into());
-        }
         if self.review_rounds > 3 {
             return Err("Review at most 3 rounds.".into());
         }
@@ -173,10 +164,9 @@ pub async fn request_new(studio: State<'_, Arc<Studio>>, body: NewRequest) -> An
         if request.prompt.chars().count() < 3 {
             return Err("Say what to make.".into());
         }
-        request.count = Some(body.count);
         request.group = Some(body.group.clone());
     }
-    studio.start_request(request, body.count)
+    studio.start_request(request)
 }
 
 #[tauri::command]
@@ -330,34 +320,10 @@ fn is_token(text: &str) -> bool {
             .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
 }
 
-/// Where the published library is, when it was published, and how many uploads wait for it.
+/// The status of the uploads these variants were sent as, as the library has them now.
 #[tauri::command]
-pub async fn library_state(studio: State<'_, Arc<Studio>>) -> Answer {
-    studio.library.state().await
-}
-
-/// The uploads the library's editors accepted, which the next publication takes.
-#[tauri::command]
-pub async fn library_accepted(studio: State<'_, Arc<Studio>>) -> Answer {
-    Ok(json!({"uploads": studio.library.accepted().await?}))
-}
-
-/// Has the library publish its accepted uploads (or those named), through its API.
-#[tauri::command]
-pub async fn library_publish(
-    studio: State<'_, Arc<Studio>>,
-    upload_ids: Option<Vec<String>>,
-) -> Answer {
-    if upload_ids
-        .as_ref()
-        .is_some_and(|ids| ids.len() > library::MOST_PUBLISHED)
-    {
-        return Err(format!(
-            "A publication names at most {} uploads.",
-            library::MOST_PUBLISHED
-        ));
-    }
-    studio.library.publish(upload_ids.as_deref()).await
+pub async fn library_statuses(studio: State<'_, Arc<Studio>>, variant_ids: Vec<String>) -> Answer {
+    Ok(json!({"items": studio.library.statuses(&variant_ids).await}))
 }
 
 /* ------------------------------------------------------------------ the render windows */
@@ -431,7 +397,6 @@ mod tests {
                 .is_err_and(|e| e.contains("Unknown language xx"))
         );
         assert!(asked(json!({"prompt": "x", "model": "gpt"})).is_err());
-        assert!(asked(json!({"prompt": "x", "count": 7})).is_err());
     }
 
     #[test]

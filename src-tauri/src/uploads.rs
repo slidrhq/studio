@@ -1,8 +1,8 @@
 //! Uploads to Slidr Library ([slidrhq/library](https://github.com/slidrhq/library), README
 //! "Uploading"): the studio sends its approved work to the library's REST API, which checks it
-//! against the published library and keeps it until an editor accepts it. The studio's publication
-//! then takes the accepted uploads into the library, by the library's API too (`POST /api/publish`):
-//! the library lives in its Worker's bucket, and nothing of it is copied here.
+//! against the published library. An upload from a token that publishes is published at once, or
+//! waits in the library, saying why; publishing it is the library's business, never the studio's,
+//! and nothing of the library is copied here.
 //!
 //! A design goes as `designs: add`, with its picture, its slide in each language it was made in, and
 //! its names and search tags in Hebrew and English (ADR-108 of the app); a template's sample as
@@ -261,74 +261,12 @@ impl LibraryApi {
         }
     }
 
-    /// The uploads an editor accepted, which a publication takes: oldest first, so that of two
-    /// that touch the same thing the later one is written last.
-    pub async fn accepted(&self) -> Result<Vec<Value>, UploadError> {
-        let mut found = Vec::new();
-        let mut after: Option<String> = None;
-        loop {
-            let mut path = "/api/uploads?status=accepted&limit=200".to_owned();
-            if let Some(after) = &after {
-                path.push_str(&format!("&after={after}"));
-            }
-            let (status, answer) = self.get(path).await?;
-            let page = match answer {
-                Some(answer) if status == 200 && answer.is_object() => answer,
-                answer => {
-                    return Err(refused(
-                        status,
-                        answer.as_ref(),
-                        "listing the accepted uploads",
-                    ));
-                }
-            };
-            if let Some(uploads) = page.get("uploads").and_then(Value::as_array) {
-                found.extend(uploads.iter().filter(|upload| upload.is_object()).cloned());
-            }
-            after = page
-                .get("next")
-                .and_then(Value::as_str)
-                .filter(|next| !next.is_empty())
-                .map(str::to_owned);
-            if after.is_none() {
-                break;
-            }
-        }
-        found.reverse();
-        Ok(found)
-    }
-
-    /// Where the published library is, when it was published, and how many uploads wait
-    /// (`GET /api/library`).
-    pub async fn library(&self) -> Result<Value, UploadError> {
-        match self.get("/api/library".into()).await? {
+    /// One upload as the library keeps it now (`GET /api/uploads/{id}`): its status, and why it
+    /// waits, when it does.
+    pub async fn upload(&self, id: &str) -> Result<Value, UploadError> {
+        match self.get(format!("/api/uploads/{id}")).await? {
             (200, Some(answer)) if answer.is_object() => Ok(answer),
-            (status, answer) => Err(refused(
-                status,
-                answer.as_ref(),
-                "reading the library's state",
-            )),
-        }
-    }
-
-    /// Writes the accepted uploads (or those named) into the library (`POST /api/publish`): the
-    /// uploads published and the files each wrote, those left accepted and why.
-    pub async fn publish(&self, upload_ids: Option<&[String]>) -> Result<Value, UploadError> {
-        let body = match upload_ids {
-            Some(ids) if !ids.is_empty() => json!({"uploads": ids}),
-            _ => json!({}),
-        };
-        let (status, answer) = self
-            .call(Call {
-                method: "POST",
-                path: "/api/publish".into(),
-                body: body.to_string().into_bytes(),
-                content_type: Some("application/json".into()),
-            })
-            .await?;
-        match answer {
-            Some(answer) if status == 200 && answer.is_object() => Ok(answer),
-            answer => Err(refused(status, answer.as_ref(), "the publication")),
+            (status, answer) => Err(refused(status, answer.as_ref(), "reading the upload")),
         }
     }
 }
@@ -488,95 +426,28 @@ pub mod tests {
             .expect("taken");
         assert_eq!(taken["id"], "u-1");
         let tokenless = LibraryApi::with("https://library.example/", None, pages);
-        let refused = tokenless.library().await.expect_err("no token");
+        let refused = tokenless.upload("u-1").await.expect_err("no token");
         assert!(refused.message.contains("no token"));
     }
 
     #[tokio::test]
-    async fn the_library_is_asked_for_its_state_its_accepted_uploads_and_a_publication() {
-        let pages = Pages::new(&[
-            (
-                "GET",
-                "/api/library",
-                200,
-                json!({"live": true, "published": "2026-10-21T00:00:00.000Z", "accepted": 3}),
-            ),
-            (
-                "GET",
-                "/api/uploads?status=accepted&limit=200",
-                200,
-                json!({"uploads": [{"id": "u-new"}, {"id": "u-mid"}], "next": "u-mid"}),
-            ),
-            (
-                "GET",
-                "/api/uploads?status=accepted&limit=200&after=u-mid",
-                200,
-                json!({"uploads": [{"id": "u-old"}]}),
-            ),
-            (
-                "POST",
-                "/api/publish",
-                200,
-                json!({"published": "2026-10-21T00:00:01.000Z", "uploads": [{"id": "u-old"}], "skipped": []}),
-            ),
-        ]);
+    async fn an_upload_is_read_for_its_status() {
+        let pages = Pages::new(&[(
+            "GET",
+            "/api/uploads/u-1",
+            200,
+            json!({"id": "u-1", "status": "published"}),
+        )]);
         let api = LibraryApi::with(
             "https://library.example/",
             Some("slk_a-token".into()),
-            pages.clone(),
+            pages,
         );
-        assert_eq!(api.library().await.expect("the state")["accepted"], 3);
-        // Oldest first, across the pages of the listing.
-        let ids: Vec<Value> = api
-            .accepted()
-            .await
-            .expect("the uploads")
-            .iter()
-            .map(|upload| upload["id"].clone())
-            .collect();
-        assert_eq!(ids, [json!("u-old"), json!("u-mid"), json!("u-new")]);
-        let done = api
-            .publish(Some(&["u-old".to_owned()]))
-            .await
-            .expect("published");
-        assert_eq!(done["uploads"], json!([{"id": "u-old"}]));
-        let last = pages
-            .sent
-            .lock()
-            .expect("the log")
-            .last()
-            .cloned()
-            .expect("sent");
         assert_eq!(
-            (
-                last.0.as_str(),
-                last.1.as_str(),
-                last.2.as_slice(),
-                last.3.as_deref()
-            ),
-            (
-                "POST",
-                "/api/publish",
-                b"{\"uploads\":[\"u-old\"]}".as_slice(),
-                Some("application/json")
-            )
+            api.upload("u-1").await.expect("the upload")["status"],
+            "published"
         );
-        api.publish(None).await.expect("published");
-        let last = pages
-            .sent
-            .lock()
-            .expect("the log")
-            .last()
-            .cloned()
-            .expect("sent");
-        assert_eq!(last.2, b"{}");
-        // What the library refuses is said in its words.
-        pages
-            .pages
-            .lock()
-            .expect("the pages")
-            .remove(&("POST".into(), "/api/publish".into()));
-        let refused = api.publish(None).await.expect_err("refused");
-        assert!(refused.message.contains("not in its bucket"));
+        let refused = api.upload("u-2").await.expect_err("not there");
+        assert!(!refused.message.is_empty());
     }
 }

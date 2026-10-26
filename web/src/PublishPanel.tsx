@@ -1,18 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
-import { LANGUAGE_NAMES, type ContentLanguage } from '@slidr/model';
+import { useEffect, useState } from 'react';
+import { LANGUAGE_NAMES } from '@slidr/model';
 import {
   api,
   isTemplate,
   renderPicture,
-  type LibraryState,
-  type LibraryUpload,
-  type Publication,
   type ServerStatus,
   type UploadItem,
   type Variant,
 } from './api';
 import { SlideView } from './SlideView';
-import { useT } from './i18n';
+import { useT, type MessageKey } from './i18n';
 
 /** Where an upload is seen up close, on the library's own page. */
 const uploadUrl = (library: string, id: string) =>
@@ -21,17 +18,30 @@ const uploadUrl = (library: string, id: string) =>
 const message = (failure: unknown) =>
   failure instanceof Error ? failure.message : String(failure);
 
-/** What became of an item sent to the library: the upload it waits as, or what is wrong. */
+const STATUS: Record<string, MessageKey> = {
+  pending: 'publish.statusPending',
+  accepted: 'publish.statusAccepted',
+  rejected: 'publish.statusRejected',
+  published: 'publish.statusPublished',
+};
+
+/** Where an item stands in the library: its upload's status and why it waits, or what is wrong. */
 function Outcome({ item, library }: { item: UploadItem; library: string }) {
   const t = useT();
-  if (item.uploadId) {
+  if (item.uploadId && item.status) {
+    const key = STATUS[item.status];
     return (
-      <p className="small ok">
-        {t('publish.waiting')}{' '}
-        <a href={uploadUrl(library, item.uploadId)} target="_blank" rel="noreferrer" dir="ltr">
-          {item.uploadId}
+      <div className="small">
+        <a
+          className={item.status === 'published' ? 'ok' : item.status === 'rejected' ? 'warn' : ''}
+          href={uploadUrl(library, item.uploadId)}
+          target="_blank"
+          rel="noreferrer"
+        >
+          {key ? t(key) : item.status}
         </a>
-      </p>
+        {item.note && <p className="muted">{item.note}</p>}
+      </div>
     );
   }
   return (
@@ -50,42 +60,11 @@ function Outcome({ item, library }: { item: UploadItem; library: string }) {
   );
 }
 
-/** One upload of the library: what it is, in which languages, by whom, and what it wrote. */
-function UploadRow({ upload, library }: { upload: LibraryUpload; library: string }) {
-  const languages = upload.languages
-    .map((lang) => LANGUAGE_NAMES[lang as ContentLanguage]?.native ?? lang)
-    .join(', ');
-  return (
-    <li>
-      <a href={uploadUrl(library, upload.id)} target="_blank" rel="noreferrer" dir="ltr">
-        {upload.id}
-      </a>{' '}
-      <code dir="ltr">
-        {upload.type}: {upload.action} {upload.target}
-      </code>
-      {languages && <span className="muted"> · {languages}</span>}
-      {upload.by && (
-        <span className="muted" dir="ltr">
-          {' '}
-          · {upload.by}
-        </span>
-      )}
-      {upload.paths && upload.paths.length > 0 && (
-        <span className="muted" dir="ltr">
-          {' '}
-          → {upload.paths.join(', ')}
-        </span>
-      )}
-    </li>
-  );
-}
-
 /**
  * Publishing. The approved work goes to the library's upload API (Slidr Library, README
- * "Uploading"), a design with its slides, names and search tags, a sample in its language; the
- * library checks each against what it publishes and keeps it until an editor accepts it. A
- * publication then writes the accepted uploads into the library, through its API too (README,
- * "Publishing the uploads"): the studio keeps no copy of the library, and writes none.
+ * "Uploading"), a design with its slides, names and search tags, a sample in its language. With the
+ * studio's token, which publishes, the library publishes each at once, or keeps it and says why:
+ * that is the library's business, and the panel only shows where each upload stands.
  */
 export function PublishPanel({
   approved,
@@ -102,29 +81,27 @@ export function PublishPanel({
   const [token, setToken] = useState('');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
-  const [sent, setSent] = useState<Record<string, UploadItem>>({});
-  const [state, setState] = useState<LibraryState>();
-  const [accepted, setAccepted] = useState<LibraryUpload[]>();
-  const [libraryError, setLibraryError] = useState<string>();
-  const [publishing, setPublishing] = useState(false);
-  const [done, setDone] = useState<Publication>();
+  const [items, setItems] = useState<Record<string, UploadItem>>({});
+  // What was approved when the panel opened: a published variant leaves the queue, and stays here.
+  const [shown] = useState(approved);
   const library = status?.library.url ?? '';
   const hasToken = status?.library.token ?? false;
 
-  /** The library's state, and the uploads that wait for it. */
-  const readLibrary = useCallback(() => {
-    if (!hasToken) return;
-    Promise.all([api.libraryState(), api.accepted()]).then(
-      ([found, { uploads }]) => {
-        setState(found);
-        setAccepted(uploads);
-        setLibraryError(undefined);
-      },
-      (failure: unknown) => setLibraryError(message(failure)),
-    );
-  }, [hasToken]);
+  const keep = (found: UploadItem[]) =>
+    setItems((before) => ({
+      ...before,
+      ...Object.fromEntries(found.map((item) => [item.variantId, item])),
+    }));
 
-  useEffect(readLibrary, [readLibrary]);
+  /** Where the uploads sent before stand in the library now. */
+  useEffect(() => {
+    const sent = shown.filter((variant) => variant.upload).map((variant) => variant.id);
+    if (!hasToken || sent.length === 0) return;
+    api.statuses(sent).then(
+      ({ items: found }) => keep(found),
+      (failure: unknown) => setError(message(failure)),
+    );
+  }, [hasToken, shown]);
 
   const saveToken = () =>
     void api.librarySettings(token).then(
@@ -136,39 +113,19 @@ export function PublishPanel({
       (failure: unknown) => setError(message(failure)),
     );
 
+  const pending = approved.filter((variant) => items[variant.id]?.status !== 'published');
+
   const send = () => {
     setBusy(true);
     setError(undefined);
     api
-      .upload(approved.map((variant) => variant.id))
+      .upload(pending.map((variant) => variant.id))
       .then(
-        ({ items }) =>
-          setSent((before) => ({
-            ...before,
-            ...Object.fromEntries(items.map((item) => [item.variantId, item])),
-          })),
+        ({ items: found }) => keep(found),
         (failure: unknown) => setError(message(failure)),
       )
-      .finally(() => {
-        setBusy(false);
-        readLibrary();
-      });
+      .finally(() => setBusy(false));
   };
-
-  const publish = () => {
-    setPublishing(true);
-    setDone(undefined);
-    setLibraryError(undefined);
-    api
-      .publish()
-      .then(setDone, (failure: unknown) => setLibraryError(message(failure)))
-      .finally(() => {
-        setPublishing(false);
-        readLibrary();
-      });
-  };
-
-  const waiting = accepted ?? [];
 
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label={t('publish.dialogLabel')}>
@@ -185,7 +142,7 @@ export function PublishPanel({
             className="ghost"
             onClick={onClose}
             aria-label={t('publish.close')}
-            disabled={busy || publishing}
+            disabled={busy}
           >
             ✕
           </button>
@@ -194,14 +151,21 @@ export function PublishPanel({
         <div className="drawer-body">
           <section>
             <h3>
-              {approved.length
-                ? t('publish.itemsToPublish', { count: approved.length })
+              {shown.length
+                ? t('publish.itemsToPublish', { count: shown.length })
                 : t('publish.noApproved')}
             </h3>
             <div className="publish-items">
-              {approved.map((variant) => {
-                const outcome = sent[variant.id];
-                const earlier = !outcome && variant.upload;
+              {shown.map((variant) => {
+                const outcome =
+                  items[variant.id] ??
+                  (variant.upload
+                    ? {
+                        variantId: variant.id,
+                        uploadId: variant.upload.id,
+                        status: variant.upload.status,
+                      }
+                    : undefined);
                 return (
                   <figure key={variant.id}>
                     {isTemplate(variant) && variant.lang ? (
@@ -230,17 +194,10 @@ export function PublishPanel({
                       </span>
                     </figcaption>
                     {outcome && <Outcome item={outcome} library={library} />}
-                    {earlier && (
-                      <Outcome
-                        item={{ variantId: variant.id, uploadId: earlier.id }}
-                        library={library}
-                      />
-                    )}
                   </figure>
                 );
               })}
             </div>
-            <p className="muted small">{t('publish.uploadNote')}</p>
           </section>
 
           {!hasToken && (
@@ -273,110 +230,13 @@ export function PublishPanel({
               <button
                 type="button"
                 className="primary"
-                disabled={approved.length === 0 || !hasToken || busy}
+                disabled={pending.length === 0 || !hasToken || busy}
                 onClick={send}
               >
-                {t('publish.upload', { count: approved.length })}
+                {t('publish.upload', { count: pending.length })}
               </button>
-              {library && (
-                <a
-                  className="small"
-                  href={`${library.replace(/\/+$/, '')}/#lib=uploads`}
-                  target="slidr-library"
-                  rel="noreferrer"
-                >
-                  {t('publish.openLibrary')}
-                </a>
-              )}
             </div>
           </section>
-
-          {hasToken && (
-            <section>
-              <h3>{t('publish.libraryTitle')}</h3>
-              <p className="muted small">{t('publish.libraryNote')}</p>
-              {state &&
-                (state.live ? (
-                  <p className="small">
-                    {t('publish.liveState', {
-                      at: state.published ? new Date(state.published).toLocaleString() : '',
-                      files: state.files ?? 0,
-                    })}
-                  </p>
-                ) : (
-                  <p className="warn small">{t('publish.notLive')}</p>
-                ))}
-              <p className={waiting.length ? '' : 'muted'}>
-                {accepted === undefined && !libraryError
-                  ? '…'
-                  : waiting.length
-                    ? t('publish.acceptedCount', { count: waiting.length })
-                    : t('publish.noAccepted')}{' '}
-                <button type="button" className="ghost small" onClick={readLibrary}>
-                  {t('publish.refresh')}
-                </button>
-              </p>
-              {waiting.length > 0 && (
-                <ul className="paths">
-                  {waiting.map((upload) => (
-                    <UploadRow key={upload.id} upload={upload} library={library} />
-                  ))}
-                </ul>
-              )}
-              {libraryError && <p className="error-text">{libraryError}</p>}
-              <div className="form-actions">
-                <button
-                  type="button"
-                  className="primary"
-                  disabled={publishing || waiting.length === 0 || state?.live === false}
-                  onClick={publish}
-                >
-                  {t('publish.publishAccepted', { count: waiting.length })}
-                </button>
-              </div>
-              {done && (
-                <div className="report">
-                  <p className="ok">
-                    {done.published
-                      ? t('publish.publishedResult', {
-                          count: done.uploads.length,
-                          at: new Date(done.published).toLocaleString(),
-                        })
-                      : t('publish.noAccepted')}
-                  </p>
-                  {done.uploads.length > 0 && (
-                    <ul className="paths">
-                      {done.uploads.map((upload) => (
-                        <UploadRow key={upload.id} upload={upload} library={library} />
-                      ))}
-                    </ul>
-                  )}
-                  {done.skipped.length > 0 && (
-                    <>
-                      <p className="warn">
-                        {t('publish.skippedResult', { count: done.skipped.length })}
-                      </p>
-                      <ul className="paths" dir="ltr">
-                        {done.skipped.map((one) => (
-                          <li key={one.id}>
-                            <a href={uploadUrl(library, one.id)} target="_blank" rel="noreferrer">
-                              {one.id}
-                            </a>{' '}
-                            {one.message}
-                            {one.issues?.map((issue, i) => (
-                              <div key={i} className="muted">
-                                <code>{issue.path}</code> {issue.message}
-                              </div>
-                            ))}
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
-                </div>
-              )}
-            </section>
-          )}
         </div>
       </div>
     </div>

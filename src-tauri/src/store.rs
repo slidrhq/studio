@@ -185,7 +185,7 @@ pub struct Request {
     pub kind: RequestKind,
     #[serde(default)]
     pub title: String,
-    /// A design request's concepts to plan at first.
+    /// The concepts planned for a design request so far.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub count: Option<u32>,
     /// The gallery group a design request files its designs under; none chosen is empty.

@@ -425,13 +425,13 @@ impl Studio {
     /* -------------------------------------------------------------- requests */
 
     /// Starts a request's work; the request as it is now.
-    pub fn start_request(self: &Arc<Self>, draft: Request, count: u32) -> Result<Request, String> {
+    pub fn start_request(self: &Arc<Self>, draft: Request) -> Result<Request, String> {
         let request = self.store.create_request(draft);
         let studio = Arc::clone(self);
         let rid = request.id.clone();
         self.spawn_request(
             &request.id,
-            Box::pin(async move { studio.begin(rid, count).await }),
+            Box::pin(async move { studio.begin(rid).await }),
         )?;
         Ok(request)
     }
@@ -458,19 +458,22 @@ impl Studio {
             .ok_or("No such request.")?;
         let studio = Arc::clone(self);
         let id = rid.to_owned();
-        self.spawn_request(rid, Box::pin(async move { studio.plan(&id, count).await }))?;
+        self.spawn_request(
+            rid,
+            Box::pin(async move { studio.plan(&id, Some(count)).await }),
+        )?;
         Ok(request)
     }
 
     /// Reads a request in words when its kind was not given, then starts its work.
-    async fn begin(self: Arc<Self>, rid: String, count: u32) -> Result<(), String> {
+    async fn begin(self: Arc<Self>, rid: String) -> Result<(), String> {
         if self.request(&rid)?.kind == RequestKind::Auto {
             self.route(&rid).await?;
         }
         if self.request(&rid)?.kind == RequestKind::Template {
             self.plan_template(&rid).await
         } else {
-            self.plan(&rid, count).await
+            self.plan(&rid, None).await
         }
     }
 
@@ -622,7 +625,8 @@ impl Studio {
         Ok(())
     }
 
-    async fn plan(self: &Arc<Self>, rid: &str, count: u32) -> Result<(), String> {
+    /// Plans `count` more concepts, or at first as many as the request asks for.
+    async fn plan(self: &Arc<Self>, rid: &str, count: Option<u32>) -> Result<(), String> {
         let known = self.library.known(false).await;
         let mut taken: HashSet<String> = known.ids.iter().cloned().collect();
         taken.extend(self.store.all_design_ids());
@@ -683,7 +687,7 @@ impl Studio {
         };
         let concepts: Vec<Value> = items(result.structured.get("concepts"))
             .iter()
-            .take(count as usize)
+            .take(count.unwrap_or(prompts::MOST_CONCEPTS) as usize)
             .cloned()
             .collect();
         if concepts.is_empty() {
@@ -695,6 +699,7 @@ impl Studio {
                 .plan
                 .get_or_insert_with(Vec::new)
                 .extend(concepts.iter().cloned());
+            request.count = Some(request.count.unwrap_or(0) + concepts.len() as u32);
             request.status = RequestStatus::Ready;
         });
         for concept in &concepts {

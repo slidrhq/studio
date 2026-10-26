@@ -173,7 +173,7 @@ export function RequestView({
         ? Math.max(0, languages.length - variants.length)
         : variants.length
           ? more
-          : (request.count ?? 1);
+          : 1;
 
   const run = (work: Promise<unknown>) =>
     work.then(
@@ -218,7 +218,9 @@ export function RequestView({
             </p>
           )}
           <p className="muted small">
-            {kind === 'design' && t('request.proposalCount', { count: request.count ?? 1 })}
+            {kind === 'design' &&
+              request.count !== undefined &&
+              t('request.proposalCount', { count: request.count })}
             {kind === 'template' ? t('request.writtenIn') : t('request.languagesLabel')}
             {languages.map((lang, i) => (
               <span key={lang}>

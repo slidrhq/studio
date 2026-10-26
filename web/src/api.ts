@@ -135,40 +135,6 @@ export interface Variant {
   updatedAt: number;
 }
 
-/** An upload of the library that a publication takes, or took: what it is, and what it wrote. */
-export interface LibraryUpload {
-  id: string;
-  type: string;
-  action: string;
-  target: string;
-  languages: string[];
-  by?: string | null;
-  updated?: string;
-  /** The files of the library it wrote, once it was published. */
-  paths?: string[];
-}
-
-/** Where the published library is, as the library says (`GET /api/library` of its API). */
-export interface LibraryState {
-  /** Whether the library is in its bucket, where a publication writes. */
-  live: boolean;
-  published?: string;
-  files?: number;
-  bytes?: number;
-  /** The uploads the next publication takes. */
-  accepted: number;
-}
-
-/** What came of a publication (`POST /api/publish` of the library's API). */
-export interface Publication {
-  published?: string;
-  uploads: LibraryUpload[];
-  skipped: { id: string; message: string; issues?: { path: string; message: string }[] }[];
-  added: string[];
-  changed: string[];
-  remaining: number;
-}
-
 export interface ProgramStatus {
   name: string;
   path: string | null;
@@ -188,9 +154,12 @@ export interface ServerStatus {
 /** What became of one approved item sent to the library's upload API. */
 export interface UploadItem {
   variantId: string;
-  /** The upload it waits as, in the library. */
+  /** The upload it is, in the library. */
   uploadId?: string;
+  /** pending, accepted, rejected or published: the library publishes it, or says why it waits. */
   status?: string;
+  /** Why it waits, when it does. */
+  note?: string | null;
   missing?: string[];
   /** Why the library did not take it, and each issue at its place. */
   error?: string;
@@ -313,7 +282,6 @@ export const api = {
     kind: RequestKind;
     prompt: string;
     templateId?: string;
-    count: number;
     group: string;
     model: string;
     effort: string;
@@ -329,13 +297,9 @@ export const api = {
   newImage: (vid: string, instruction: string) => call('variant_image', { vid, instruction }),
   approve: (vid: string, value: boolean) => call('variant_approve', { vid, value }),
   discard: (vid: string, value: boolean) => call('variant_discard', { vid, value }),
-  /** The uploads the library's editors accepted, which the next publication takes. */
-  accepted: () => call<{ uploads: LibraryUpload[] }>('library_accepted'),
-  /** Where the published library is, and how many uploads wait for it. */
-  libraryState: () => call<LibraryState>('library_state'),
-  /** Has the library publish its accepted uploads (or those named), through its API. */
-  publish: (uploadIds?: string[]) =>
-    call<Publication>('library_publish', { uploadIds: uploadIds ?? null }),
+  /** The status of the uploads these variants were sent as, as the library has them now. */
+  statuses: (variantIds: string[]) =>
+    call<{ items: UploadItem[] }>('library_statuses', { variantIds }),
   upload: (variantIds?: string[]) =>
     call<{ items: UploadItem[] }>('library_upload', { variantIds: variantIds ?? null }),
   librarySettings: (token: string, url = '') =>

@@ -127,7 +127,6 @@ export function RequestForm({ onCreated }: { onCreated: (request: StudioRequest)
   const t = useT();
   const [kind, setKind] = useState<RequestKind>('auto');
   const [prompt, setPrompt] = useState('');
-  const [count, setCount] = useState(3);
   const [group, setGroup] = useState('');
   const [model, setModel] = useState('');
   const [effort, setEffort] = useState('');
@@ -172,7 +171,6 @@ export function RequestForm({ onCreated }: { onCreated: (request: StudioRequest)
           kind,
           prompt,
           ...(kind === 'template' ? { templateId } : {}),
-          count,
           group,
           model,
           effort,
@@ -191,11 +189,7 @@ export function RequestForm({ onCreated }: { onCreated: (request: StudioRequest)
       ? sampleLangs.length === 1
         ? t('form.writeSampleOne')
         : t('form.writeSampleMany', { count: sampleLangs.length })
-      : kind === 'auto'
-        ? t('form.send')
-        : count === 1
-          ? t('form.createOne')
-          : t('form.createMany', { count });
+      : t('form.send');
 
   return (
     <form className="request-form" onSubmit={(event) => void submit(event)}>
@@ -289,16 +283,6 @@ export function RequestForm({ onCreated }: { onCreated: (request: StudioRequest)
       <div className="form-grid">
         {kind !== 'template' && (
           <>
-            <label className="field">
-              <span>{t('form.proposalCount')}</span>
-              <select value={count} onChange={(event) => setCount(Number(event.target.value))}>
-                {[1, 2, 3, 4, 5, 6].map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </label>
             <label className="field">
               <span>{t('form.galleryGroup')}</span>
               <select value={group} onChange={(event) => setGroup(event.target.value)}>
