@@ -101,9 +101,14 @@ function GallerySection({ hasToken, library }: { hasToken: boolean; library: str
       <p className="muted small">{t('publish.galleryHelp')}</p>
       {missing && (
         <p className="small">
-          {missing.slides
-            ? t('publish.galleryMissing', { slides: missing.slides, designs: missing.designs })
-            : t('publish.galleryNone')}
+          {missing.stale
+            ? t('publish.galleryStale')
+            : missing.slides
+              ? t('publish.galleryMissing', {
+                  slides: missing.slides,
+                  designs: missing.designs ?? 0,
+                })
+              : t('publish.galleryNone')}
         </p>
       )}
       {drawn && (
@@ -140,10 +145,16 @@ function GallerySection({ hasToken, library }: { hasToken: boolean; library: str
       )}
       {error && <p className="error-text">{error}</p>}
       <div className="form-actions">
-        <button type="button" disabled={!hasToken || busy || !missing?.slides} onClick={draw}>
+        <button
+          type="button"
+          disabled={!hasToken || busy || !(missing?.stale || missing?.slides)}
+          onClick={draw}
+        >
           {busy
             ? t('publish.galleryDrawing')
-            : t('publish.galleryDraw', { count: missing?.slides ?? 0 })}
+            : missing?.stale
+              ? t('publish.galleryDrawStale')
+              : t('publish.galleryDraw', { count: missing?.slides ?? 0 })}
         </button>
       </div>
     </section>

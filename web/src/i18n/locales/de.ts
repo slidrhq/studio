@@ -61,6 +61,9 @@ const words: Record<MessageKey, string> = {
     'Die Bilder der Designs der Bibliothek in 320 × 180, wie die Galerien sie zeigen. Ein Design ohne Bild seiner Folie, wie sie jetzt ist, wird in der Galerie live gezeichnet. Das Studio zeichnet die fehlenden und sendet sie an die Bibliothek.',
   'publish.galleryMissing': 'Es fehlen {slides} Bilder von {designs} Designs',
   'publish.galleryNone': 'Jede Folie der Bibliothek hat ihr Bild',
+  'publish.galleryStale':
+    'Die Bibliothek hat sich geändert, seit sie ihre Designs zuletzt aufgelistet hat, daher ist noch nicht bekannt, wie viele Bilder fehlen. Das Studio lässt sie die Liste aktualisieren (ohne einen Upload zu veröffentlichen) und zeichnet dann die fehlenden.',
+  'publish.galleryDrawStale': 'Aktualisieren, zeichnen und senden',
   'publish.galleryDraw': '{count} zeichnen und senden',
   'publish.galleryDrawing': 'Wird gezeichnet…',
   'publish.galleryFailed': '{count} konnten nicht gezeichnet werden',

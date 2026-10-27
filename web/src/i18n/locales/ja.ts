@@ -61,6 +61,9 @@ const words: Record<MessageKey, string> = {
     'ギャラリーに表示される、ライブラリのデザインの 320 × 180 の画像です。現在のスライドの画像がないデザインは、ギャラリーでその場で描画されます。スタジオが不足分を描いてライブラリに送ります。',
   'publish.galleryMissing': '{designs} 件のデザインの画像が {slides} 枚不足しています',
   'publish.galleryNone': 'ライブラリのすべてのスライドに画像があります',
+  'publish.galleryStale':
+    'ライブラリはデザインの一覧を最後に書いてから変わったため、不足している画像の数はまだわかりません。スタジオがライブラリに一覧を更新させ（アップロードは公開しません）、その後不足分を描きます。',
+  'publish.galleryDrawStale': '更新して描いて送信',
   'publish.galleryDraw': '{count} 枚を描いて送信',
   'publish.galleryDrawing': '描画中…',
   'publish.galleryFailed': '{count} 枚を描けませんでした',

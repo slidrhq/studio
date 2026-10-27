@@ -60,6 +60,9 @@ const words: Record<MessageKey, string> = {
     '图库显示的媒体库设计的 320 × 180 图片。若设计没有其当前幻灯片的图片，图库会实时绘制它。工作室会绘制缺少的图片并发送到媒体库。',
   'publish.galleryMissing': '{designs} 个设计缺少 {slides} 张图片',
   'publish.galleryNone': '媒体库中的每张幻灯片都有图片',
+  'publish.galleryStale':
+    '媒体库自上次列出其设计以来已有变化，因此尚不知道缺少多少张图片。工作室会让媒体库更新列表（不发布任何上传），然后绘制缺少的图片。',
+  'publish.galleryDrawStale': '更新、绘制并发送',
   'publish.galleryDraw': '绘制并发送 {count} 张',
   'publish.galleryDrawing': '正在绘制…',
   'publish.galleryFailed': '{count} 张无法绘制',

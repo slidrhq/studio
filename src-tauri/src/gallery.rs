@@ -8,6 +8,7 @@
 //! app's own among them, and slides changed since they were drawn.
 //!
 //! ```text
+//! revs.json of another library  ──►  the library writes it again, publishing no upload
 //! revs.json, thumbs/index.json   ──►  each slide whose word has no picture (`missing`)
 //! render.html, kind "gallery"    ──►  the slide as published, 320×180, a window per batch
 //! designs: draw, a design each   ──►  the library takes each picture while its slide is the one drawn
@@ -53,13 +54,13 @@ fn catalog_by_name(id: &str) -> &'static str {
 }
 
 /// The slides of the published designs that have no picture of them as they are, by design and in
-/// the order of the languages. `revs.json` must be of the library as the manifest lists it: the
-/// words of another are not those an app makes.
+/// the order of the languages; none when `revs.json` is not of the library as the manifest lists
+/// it (the words of another are not those an app makes), until the library writes it again.
 pub fn missing(
     manifest: &Value,
     revs: Option<&Value>,
     thumbs: Option<&Value>,
-) -> Result<Vec<Missing>, String> {
+) -> Result<Option<Vec<Missing>>, String> {
     let files = manifest
         .get("files")
         .and_then(Value::as_object)
@@ -70,16 +71,13 @@ pub fn missing(
         revs.and_then(|revs| revs.get("designs"))
             .and_then(Value::as_object),
     ) else {
-        return Err(format!("The library has no words of its designs ({REVS})."));
+        return Ok(None);
     };
     if from
         .iter()
         .any(|(path, hash)| files.get(path).and_then(|file| file.get("sha256")) != Some(hash))
     {
-        return Err(format!(
-            "The words of the designs ({REVS}) are of the library before it changed: publish it \
-             once (Try again in Slidr Library), then draw."
-        ));
+        return Ok(None);
     }
     let mut catalog_of: BTreeMap<&str, &str> = BTreeMap::new();
     if let Some(catalogs) = revs
@@ -126,17 +124,26 @@ pub fn missing(
     }
     let order = |lang: &str| CONTENT_LANGUAGES.iter().position(|one| *one == lang);
     found.sort_by(|a, b| (&a.id, order(&a.lang)).cmp(&(&b.id, order(&b.lang))));
-    Ok(found)
+    Ok(Some(found))
 }
 
 /// A slide drawn, as its upload takes it: its language, its word and its picture as WebP.
 pub type Drawn = (String, String, Vec<u8>);
 
 /// Draws the slides the library has no picture of, and sends each design's pictures to it as
-/// `designs: draw`. `work` holds the renders of this drawing. The answer says how many were
-/// missing, each upload, and each slide that could not be drawn.
+/// `designs: draw`; when its words are of another library, it has the library write them first.
+/// `work` holds the renders of this drawing. The answer says how many were missing, each upload,
+/// and each slide that could not be drawn.
 pub async fn draw(library: &Library, renders: &Renders, work: &Path) -> Result<Value, String> {
-    let missing = library.gallery_missing().await?;
+    let missing = match library.gallery_missing().await? {
+        Some(missing) => missing,
+        None => {
+            library.write_design_files().await?;
+            library.gallery_missing().await?.ok_or(
+                "The library wrote the words of its designs, but they are not of it yet: draw again in a minute.",
+            )?
+        }
+    };
     let _ = fs::remove_dir_all(work);
     let mut drawn: BTreeMap<String, Vec<Drawn>> = BTreeMap::new();
     let mut failed = Vec::new();
@@ -226,7 +233,9 @@ mod tests {
         });
         // Hebrew of m-party was drawn of a slide changed since; English of cover is as drawn.
         let thumbs = json!({"widths": [320], "designs": {"he": {"m-party": "h1", "cover": "c2"}, "en": {"cover": "c1"}}});
-        let found = missing(&manifest, Some(&revs), Some(&thumbs)).expect("the missing");
+        let found = missing(&manifest, Some(&revs), Some(&thumbs))
+            .expect("the missing")
+            .expect("words of the library");
         let listed: Vec<(&str, &str, &str, &str)> = found
             .iter()
             .map(|one| {
@@ -249,7 +258,9 @@ mod tests {
         // Without any picture, every slide is missing; without `catalogs`, by its name.
         let mut old = revs.clone();
         old.as_object_mut().expect("an object").remove("catalogs");
-        let all = missing(&manifest, Some(&old), None).expect("the missing");
+        let all = missing(&manifest, Some(&old), None)
+            .expect("the missing")
+            .expect("words of the library");
         assert_eq!(all.len(), 5);
         assert!(
             all.iter()
@@ -258,12 +269,11 @@ mod tests {
     }
 
     #[test]
-    fn words_of_another_library_draw_nothing() {
+    fn words_of_another_library_say_nothing_is_known() {
         let manifest = manifest(&[("elements/designs/managed.json", "m2")]);
         let revs = json!({"from": {"elements/designs/managed.json": "m1"}, "designs": {}});
-        assert!(
-            missing(&manifest, Some(&revs), None).is_err_and(|error| error.contains("Try again"))
-        );
-        assert!(missing(&manifest, None, None).is_err_and(|error| error.contains(REVS)));
+        assert_eq!(missing(&manifest, Some(&revs), None), Ok(None));
+        assert_eq!(missing(&manifest, None, None), Ok(None));
+        assert!(missing(&json!({}), Some(&revs), None).is_err());
     }
 }

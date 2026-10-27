@@ -328,10 +328,13 @@ pub async fn library_statuses(studio: State<'_, Arc<Studio>>, variant_ids: Vec<S
 
 /* ------------------------------------------------------------------ the galleries' pictures */
 
-/// How many slides of the published designs the library has no picture of, and of how many designs.
+/// How many slides of the published designs the library has no picture of, and of how many
+/// designs; `stale` while its words are of another library, which drawing has it write first.
 #[tauri::command]
 pub async fn gallery_missing(studio: State<'_, Arc<Studio>>) -> Answer {
-    let missing = studio.library.gallery_missing().await?;
+    let Some(missing) = studio.library.gallery_missing().await? else {
+        return Ok(json!({"stale": true}));
+    };
     let mut designs: Vec<&str> = missing.iter().map(|slide| slide.id.as_str()).collect();
     designs.dedup();
     Ok(json!({"slides": missing.len(), "designs": designs.len()}))

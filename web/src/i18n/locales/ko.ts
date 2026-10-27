@@ -60,6 +60,9 @@ const words: Record<MessageKey, string> = {
     '갤러리에 표시되는 라이브러리 디자인의 320 × 180 이미지입니다. 현재 슬라이드의 이미지가 없는 디자인은 갤러리에서 바로 그려집니다. 스튜디오가 없는 이미지를 그려 라이브러리로 보냅니다.',
   'publish.galleryMissing': '디자인 {designs}개의 이미지 {slides}개가 없습니다',
   'publish.galleryNone': '라이브러리의 모든 슬라이드에 이미지가 있습니다',
+  'publish.galleryStale':
+    '라이브러리가 디자인 목록을 마지막으로 작성한 뒤 바뀌어서, 없는 이미지가 몇 개인지 아직 알 수 없습니다. 스튜디오가 라이브러리에 목록을 갱신하게 한 뒤(업로드는 게시하지 않음) 없는 이미지를 그립니다.',
+  'publish.galleryDrawStale': '갱신하고 그려서 보내기',
   'publish.galleryDraw': '{count}개 그려서 보내기',
   'publish.galleryDrawing': '그리는 중…',
   'publish.galleryFailed': '{count}개를 그리지 못했습니다',

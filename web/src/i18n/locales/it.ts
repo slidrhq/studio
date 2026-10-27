@@ -61,6 +61,9 @@ const words: Record<MessageKey, string> = {
     "Le immagini 320 × 180 dei design della libreria che le gallerie mostrano. Un design senza l'immagine della sua slide com'è ora viene disegnato dal vivo nella galleria. Lo studio disegna quelle mancanti e le invia alla libreria.",
   'publish.galleryMissing': 'Mancano {slides} immagini di {designs} design',
   'publish.galleryNone': 'Ogni slide della libreria ha la sua immagine',
+  'publish.galleryStale':
+    'La libreria è cambiata da quando ha elencato i suoi design, quindi non si sa ancora quante immagini mancano. Lo studio le farà aggiornare l’elenco (senza pubblicare alcun caricamento), poi disegnerà quelle mancanti.',
+  'publish.galleryDrawStale': 'Aggiorna, disegna e invia',
   'publish.galleryDraw': 'Disegna e invia {count}',
   'publish.galleryDrawing': 'Disegno in corso…',
   'publish.galleryFailed': 'Impossibile disegnarne {count}',

@@ -60,6 +60,9 @@ const words: Record<MessageKey, string> = {
     'صور بحجم 320×180 لشرائح تصاميم المكتبة كما تعرضها المعارض. التصميم الذي لا صورة لشريحته كما هي الآن يُرسم مباشرة في المعرض. يرسم الاستوديو الصور الناقصة ويرسلها إلى المكتبة.',
   'publish.galleryMissing': 'تنقص {slides} صورة لـ {designs} تصميم',
   'publish.galleryNone': 'لكل شريحة في المكتبة صورتها',
+  'publish.galleryStale':
+    'تغيّرت المكتبة منذ أن كتبت قائمة تصاميمها آخر مرة، لذا لا يُعرف بعد عدد الصور الناقصة. سيطلب الاستوديو منها تحديث القائمة (دون نشر أي رفع)، ثم يرسم الناقصة.',
+  'publish.galleryDrawStale': 'تحديث ورسم وإرسال',
   'publish.galleryDraw': 'رسم وإرسال {count}',
   'publish.galleryDrawing': 'جارٍ الرسم…',
   'publish.galleryFailed': 'تعذّر رسم {count}',

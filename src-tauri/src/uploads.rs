@@ -271,6 +271,28 @@ impl LibraryApi {
         }
     }
 
+    /// Has the library write again what it makes of the catalogs of its designs, publishing no
+    /// upload (`POST /api/publish`, `{"uploads": []}`): the publication, or none when they were of
+    /// it already.
+    pub async fn write_design_files(&self) -> Result<Value, UploadError> {
+        let (status, answer) = self
+            .call(Call {
+                method: "POST",
+                path: "/api/publish".into(),
+                body: br#"{"uploads":[]}"#.to_vec(),
+                content_type: Some("application/json".into()),
+            })
+            .await?;
+        match answer {
+            Some(answer) if status == 200 && answer.is_object() => Ok(answer),
+            answer => Err(refused(
+                status,
+                answer.as_ref(),
+                "writing the words of the designs",
+            )),
+        }
+    }
+
     /// One upload as the library keeps it now (`GET /api/uploads/{id}`): its status, and why it
     /// waits, when it does.
     pub async fn upload(&self, id: &str) -> Result<Value, UploadError> {
@@ -459,5 +481,26 @@ pub mod tests {
         );
         let refused = api.upload("u-2").await.expect_err("not there");
         assert!(!refused.message.is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_words_of_the_designs_are_written_by_a_publication_of_no_upload() {
+        let pages = Pages::new(&[(
+            "POST",
+            "/api/publish",
+            200,
+            json!({"uploads": [], "published": "2026-10-27T12:00:00.000Z"}),
+        )]);
+        let api = LibraryApi::with(
+            "https://library.example/",
+            Some("slk_a-token".into()),
+            Arc::clone(&pages) as Arc<dyn Transport>,
+        );
+        let answer = api.write_design_files().await.expect("written");
+        assert_eq!(answer["uploads"], json!([]));
+        let sent = pages.sent.lock().expect("the log")[0].clone();
+        assert_eq!((sent.0.as_str(), sent.1.as_str()), ("POST", "/api/publish"));
+        assert_eq!(sent.2, br#"{"uploads":[]}"#);
+        assert_eq!(sent.3.as_deref(), Some("application/json"));
     }
 }

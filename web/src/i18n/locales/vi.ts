@@ -60,6 +60,9 @@ const words: Record<MessageKey, string> = {
     'Ảnh 320 × 180 của các thiết kế trong thư viện, như phần trưng bày hiển thị. Thiết kế chưa có ảnh của trang chiếu như hiện tại sẽ được vẽ trực tiếp. Studio vẽ những ảnh còn thiếu và gửi chúng đến thư viện.',
   'publish.galleryMissing': 'Thiếu {slides} ảnh của {designs} thiết kế',
   'publish.galleryNone': 'Mọi trang chiếu trong thư viện đều có ảnh',
+  'publish.galleryStale':
+    'Thư viện đã thay đổi kể từ lần cuối liệt kê các thiết kế, nên chưa biết còn thiếu bao nhiêu ảnh. Studio sẽ yêu cầu thư viện cập nhật danh sách (không xuất bản bản tải lên nào), rồi vẽ những ảnh còn thiếu.',
+  'publish.galleryDrawStale': 'Cập nhật, vẽ và gửi',
   'publish.galleryDraw': 'Vẽ và gửi {count}',
   'publish.galleryDrawing': 'Đang vẽ…',
   'publish.galleryFailed': 'Không vẽ được {count}',

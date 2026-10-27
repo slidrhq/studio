@@ -168,8 +168,10 @@ export interface UploadItem {
 
 /** The slides of the published designs that the library has no picture of (src-tauri/src/gallery.rs). */
 export interface GalleryMissing {
-  slides: number;
-  designs: number;
+  slides?: number;
+  designs?: number;
+  /** The library's words are of it before it changed: drawing has it write them first. */
+  stale?: boolean;
 }
 
 /** What a drawing of the galleries' pictures did: an upload of each design, and what failed. */

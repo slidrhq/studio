@@ -61,6 +61,9 @@ const words: Record<MessageKey, string> = {
     'Les images 320 × 180 des designs de la médiathèque que montrent les galeries. Un design sans image de sa diapositive telle qu’elle est maintenant est dessiné en direct dans la galerie. Le studio dessine celles qui manquent et les envoie à la médiathèque.',
   'publish.galleryMissing': 'Il manque {slides} images de {designs} designs',
   'publish.galleryNone': 'Chaque diapositive de la médiathèque a son image',
+  'publish.galleryStale':
+    'La médiathèque a changé depuis qu’elle a listé ses designs, donc on ne sait pas encore combien d’images manquent. Le studio lui fera mettre la liste à jour (sans publier aucun envoi), puis dessinera celles qui manquent.',
+  'publish.galleryDrawStale': 'Mettre à jour, dessiner et envoyer',
   'publish.galleryDraw': 'Dessiner et envoyer {count}',
   'publish.galleryDrawing': 'Dessin en cours…',
   'publish.galleryFailed': '{count} n’ont pas pu être dessinées',

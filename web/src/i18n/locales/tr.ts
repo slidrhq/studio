@@ -61,6 +61,9 @@ const words: Record<MessageKey, string> = {
     'Galerilerin gösterdiği, kütüphanedeki tasarımların 320 × 180 görselleri. Slaytının şimdiki hâlinin görseli olmayan bir tasarım galeride anında çizilir. Stüdyo eksik olanları çizip kütüphaneye gönderir.',
   'publish.galleryMissing': '{designs} tasarımın {slides} görseli eksik',
   'publish.galleryNone': 'Kütüphanedeki her slaytın görseli var',
+  'publish.galleryStale':
+    'Kütüphane, tasarımlarını son listelediğinden beri değişti; bu yüzden kaç görselin eksik olduğu henüz bilinmiyor. Stüdyo kütüphaneye listeyi güncelletecek (hiçbir yüklemeyi yayımlamadan), sonra eksikleri çizecek.',
+  'publish.galleryDrawStale': 'Güncelle, çiz ve gönder',
   'publish.galleryDraw': '{count} tanesini çiz ve gönder',
   'publish.galleryDrawing': 'Çiziliyor…',
   'publish.galleryFailed': '{count} tanesi çizilemedi',

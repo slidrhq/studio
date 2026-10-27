@@ -501,8 +501,8 @@ impl Library {
     /* -------------------------------------------------------------- the galleries' pictures */
 
     /// The slides of the published designs that the library has no picture of, as they are
-    /// (`gallery.rs`).
-    pub async fn gallery_missing(&self) -> Result<Vec<Missing>, String> {
+    /// (`gallery.rs`); none while its words are of another library.
+    pub async fn gallery_missing(&self) -> Result<Option<Vec<Missing>>, String> {
         let manifest = self
             .published_json(gallery::MANIFEST)
             .await?
@@ -510,6 +510,15 @@ impl Library {
         let revs = self.published_json(gallery::REVS).await?;
         let thumbs = self.published_json(gallery::THUMBS).await?;
         gallery::missing(&manifest, revs.as_ref(), thumbs.as_ref())
+    }
+
+    /// Has the library write the words of its designs again, publishing no upload.
+    pub async fn write_design_files(&self) -> Result<(), String> {
+        self.api()
+            .write_design_files()
+            .await
+            .map(drop)
+            .map_err(|error| error.message)
     }
 
     /// Sends the pictures drawn of each design's slides as `designs: draw`, one upload a design.

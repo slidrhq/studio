@@ -61,6 +61,9 @@ const words: Record<MessageKey, string> = {
     'Gambar 320 × 180 dari desain pustaka yang ditampilkan galeri. Desain tanpa gambar slidenya seperti sekarang digambar langsung di galeri. Studio menggambar yang belum ada dan mengirimkannya ke pustaka.',
   'publish.galleryMissing': '{slides} gambar dari {designs} desain belum ada',
   'publish.galleryNone': 'Setiap slide di pustaka sudah punya gambarnya',
+  'publish.galleryStale':
+    'Pustaka berubah sejak terakhir kali mencatat desainnya, jadi belum diketahui berapa gambar yang belum ada. Studio akan memintanya memperbarui daftar (tanpa menerbitkan unggahan apa pun), lalu menggambar yang belum ada.',
+  'publish.galleryDrawStale': 'Perbarui, gambar, dan kirim',
   'publish.galleryDraw': 'Gambar dan kirim {count}',
   'publish.galleryDrawing': 'Menggambar…',
   'publish.galleryFailed': '{count} tidak dapat digambar',
