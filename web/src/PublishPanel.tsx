@@ -204,11 +204,15 @@ export function PublishPanel({
     );
   }, [hasToken, shown]);
 
+  // A token kept is replaced the same way it was given: one of another scope, or a new one.
+  const [replacing, setReplacing] = useState(false);
+
   const saveToken = () =>
     void api.librarySettings(token).then(
       () => {
         setToken('');
         setError(undefined);
+        setReplacing(false);
         onStatus();
       },
       (failure: unknown) => setError(message(failure)),
@@ -301,7 +305,7 @@ export function PublishPanel({
             </div>
           </section>
 
-          {!hasToken && (
+          {(!hasToken || replacing) && (
             <section className="token">
               <h3>{t('publish.tokenTitle')}</h3>
               <p className="muted small">{t('publish.tokenHelp')}</p>
@@ -321,6 +325,18 @@ export function PublishPanel({
                 >
                   {t('publish.save')}
                 </button>
+                {replacing && (
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => {
+                      setToken('');
+                      setReplacing(false);
+                    }}
+                  >
+                    {t('publish.keepToken')}
+                  </button>
+                )}
               </div>
             </section>
           )}
@@ -340,6 +356,14 @@ export function PublishPanel({
           </section>
 
           <GallerySection hasToken={hasToken} library={library} />
+
+          {hasToken && !replacing && (
+            <section>
+              <button type="button" className="ghost" onClick={() => setReplacing(true)}>
+                {t('publish.replaceToken')}
+              </button>
+            </section>
+          )}
         </div>
       </div>
     </div>

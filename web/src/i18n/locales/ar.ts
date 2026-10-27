@@ -46,6 +46,8 @@ const words: Record<MessageKey, string> = {
   'publish.itemsToPublish': '{count} عناصر للنشر',
   'publish.noApproved': 'لا توجد عناصر معتمدة',
   'publish.save': 'حفظ',
+  'publish.replaceToken': 'استبدال رمز المكتبة',
+  'publish.keepToken': 'الإبقاء على الرمز الحالي',
   'publish.tokenTitle': 'رمز المكتبة',
   'publish.tokenHelp':
     'رمز من الملف الشخصي في المكتبة، بصلاحية «الرفع والنشر»، ينشئه هناك أحد مشرفي المكتبة. يُحفظ في مدير بيانات الاعتماد في Windows على هذا الحاسوب.',

@@ -5,6 +5,8 @@ export const he = {
   'publish.itemsToPublish': '{count} פריטים לפרסום',
   'publish.noApproved': 'אין פריטים מאושרים',
   'publish.save': 'שמור',
+  'publish.replaceToken': 'החלפת הטוקן של הספרייה',
+  'publish.keepToken': 'השארת הטוקן הנוכחי',
   'publish.tokenTitle': 'הטוקן של הספרייה',
   'publish.tokenHelp':
     'טוקן מהפרופיל בספרייה, בהרשאת "העלאה ופרסום", שמנהל של הספרייה יוצר. נשמר במנהל האישורים של Windows במחשב הזה.',
@@ -34,6 +36,8 @@ export const en: typeof he = {
   'publish.itemsToPublish': '{count} items to publish',
   'publish.noApproved': 'No approved items',
   'publish.save': 'Save',
+  'publish.replaceToken': "Replace the library's token",
+  'publish.keepToken': 'Keep the current token',
   'publish.tokenTitle': "The library's token",
   'publish.tokenHelp':
     "A token from the library's profile, of the publish scope, which an admin of the library makes there. Kept in Windows' Credential Manager on this computer.",

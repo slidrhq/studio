@@ -47,6 +47,8 @@ const words: Record<MessageKey, string> = {
   'publish.itemsToPublish': 'प्रकाशित करने के लिए {count} आइटम',
   'publish.noApproved': 'कोई मंज़ूर आइटम नहीं',
   'publish.save': 'सहेजें',
+  'publish.replaceToken': 'लाइब्रेरी का टोकन बदलें',
+  'publish.keepToken': 'मौजूदा टोकन रखें',
   'publish.tokenTitle': 'लाइब्रेरी का टोकन',
   'publish.tokenHelp':
     'लाइब्रेरी की प्रोफ़ाइल से "अपलोड और प्रकाशन" अनुमति वाला टोकन, जिसे लाइब्रेरी का कोई एडमिन वहाँ बनाता है। यह इस कंप्यूटर के Windows क्रेडेंशियल मैनेजर में रखा जाता है।',

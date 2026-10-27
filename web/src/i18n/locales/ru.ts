@@ -47,6 +47,8 @@ const words: Record<MessageKey, string> = {
   'publish.itemsToPublish': 'Элементов к публикации: {count}',
   'publish.noApproved': 'Нет утверждённых элементов',
   'publish.save': 'Сохранить',
+  'publish.replaceToken': 'Заменить токен медиатеки',
+  'publish.keepToken': 'Оставить текущий токен',
   'publish.tokenTitle': 'Токен медиатеки',
   'publish.tokenHelp':
     'Токен из профиля медиатеки с правом на «Загрузку и публикацию», который там создаёт администратор медиатеки. Хранится в диспетчере учётных данных Windows на этом компьютере.',

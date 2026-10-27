@@ -47,6 +47,8 @@ const words: Record<MessageKey, string> = {
   'publish.itemsToPublish': '公開する項目: {count} 件',
   'publish.noApproved': '承認済みの項目はありません',
   'publish.save': '保存',
+  'publish.replaceToken': 'ライブラリのトークンを置き換える',
+  'publish.keepToken': '現在のトークンのままにする',
   'publish.tokenTitle': 'メディアライブラリのトークン',
   'publish.tokenHelp':
     'メディアライブラリの管理者がプロフィールで作成する、「アップロードと公開」権限のトークン。このコンピューターの Windows 資格情報マネージャーに保存されます。',

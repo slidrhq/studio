@@ -47,6 +47,8 @@ const words: Record<MessageKey, string> = {
   'publish.itemsToPublish': 'Yayınlanacak {count} öğe',
   'publish.noApproved': 'Onaylanmış öğe yok',
   'publish.save': 'Kaydet',
+  'publish.replaceToken': 'Kütüphane tokenini değiştir',
+  'publish.keepToken': 'Mevcut tokeni koru',
   'publish.tokenTitle': 'Kütüphanenin belirteci',
   'publish.tokenHelp':
     'Kütüphanedeki profilden, bir kütüphane yöneticisinin orada oluşturduğu "Yükleme ve yayımlama" izinli bir belirteç. Bu bilgisayarın Windows Kimlik Bilgileri Yöneticisi\'nde tutulur.',

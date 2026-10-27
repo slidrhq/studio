@@ -47,6 +47,8 @@ const words: Record<MessageKey, string> = {
   'publish.itemsToPublish': '{count} itens para publicar',
   'publish.noApproved': 'Nenhum item aprovado',
   'publish.save': 'Salvar',
+  'publish.replaceToken': 'Substituir o token da biblioteca',
+  'publish.keepToken': 'Manter o token atual',
   'publish.tokenTitle': 'O token da biblioteca',
   'publish.tokenHelp':
     'Um token do perfil da biblioteca, com a permissão "Enviar e publicar", que um administrador da biblioteca cria lá. Fica no Gerenciador de Credenciais do Windows deste computador.',

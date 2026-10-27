@@ -47,6 +47,8 @@ const words: Record<MessageKey, string> = {
   'publish.itemsToPublish': '{count} item untuk diterbitkan',
   'publish.noApproved': 'Tidak ada item yang disetujui',
   'publish.save': 'Simpan',
+  'publish.replaceToken': 'Ganti token pustaka',
+  'publish.keepToken': 'Pertahankan token saat ini',
   'publish.tokenTitle': 'Token pustaka',
   'publish.tokenHelp':
     'Token dari profil di pustaka, dengan izin "Mengunggah dan menerbitkan", yang dibuat di sana oleh admin pustaka. Disimpan di Credential Manager Windows di komputer ini.',

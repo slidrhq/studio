@@ -47,6 +47,8 @@ const words: Record<MessageKey, string> = {
   'publish.itemsToPublish': '{count} elementi da pubblicare',
   'publish.noApproved': 'Nessun elemento approvato',
   'publish.save': 'Salva',
+  'publish.replaceToken': 'Sostituisci il token della libreria',
+  'publish.keepToken': 'Mantieni il token attuale',
   'publish.tokenTitle': 'Il token della libreria',
   'publish.tokenHelp':
     'Un token dal profilo della libreria, con il permesso «Caricare e pubblicare», che un amministratore della libreria crea lì. Tenuto nel Gestore credenziali di Windows di questo computer.',

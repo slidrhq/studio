@@ -46,6 +46,8 @@ const words: Record<MessageKey, string> = {
   'publish.itemsToPublish': '게시할 항목 {count}개',
   'publish.noApproved': '승인된 항목 없음',
   'publish.save': '저장',
+  'publish.replaceToken': '라이브러리 토큰 바꾸기',
+  'publish.keepToken': '현재 토큰 유지',
   'publish.tokenTitle': '미디어 라이브러리 토큰',
   'publish.tokenHelp':
     '미디어 라이브러리 관리자가 프로필에서 만드는 "업로드 및 게시" 권한의 토큰. 이 컴퓨터의 Windows 자격 증명 관리자에 보관됩니다.',

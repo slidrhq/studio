@@ -47,6 +47,8 @@ const words: Record<MessageKey, string> = {
   'publish.itemsToPublish': '{count} Elemente zu veröffentlichen',
   'publish.noApproved': 'Keine freigegebenen Elemente',
   'publish.save': 'Speichern',
+  'publish.replaceToken': 'Token der Bibliothek ersetzen',
+  'publish.keepToken': 'Aktuellen Token behalten',
   'publish.tokenTitle': 'Token der Bibliothek',
   'publish.tokenHelp':
     'Ein Token aus dem Profil der Bibliothek mit dem Recht „Hochladen und veröffentlichen“, das ein Admin der Bibliothek dort erstellt. Wird in der Windows-Anmeldeinformationsverwaltung dieses Computers gespeichert.',

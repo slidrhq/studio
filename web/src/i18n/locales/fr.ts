@@ -47,6 +47,8 @@ const words: Record<MessageKey, string> = {
   'publish.itemsToPublish': '{count} éléments à publier',
   'publish.noApproved': 'Aucun élément approuvé',
   'publish.save': 'Enregistrer',
+  'publish.replaceToken': 'Remplacer le jeton de la médiathèque',
+  'publish.keepToken': 'Garder le jeton actuel',
   'publish.tokenTitle': 'Le jeton de la médiathèque',
   'publish.tokenHelp':
     'Un jeton du profil de la médiathèque, avec l’autorisation « Téléverser et publier », qu’un administrateur de la médiathèque y crée. Gardé dans le Gestionnaire d’identification de Windows de cet ordinateur.',

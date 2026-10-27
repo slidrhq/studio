@@ -46,6 +46,8 @@ const words: Record<MessageKey, string> = {
   'publish.itemsToPublish': '{count} mục để xuất bản',
   'publish.noApproved': 'Chưa có mục nào được duyệt',
   'publish.save': 'Lưu',
+  'publish.replaceToken': 'Thay mã thông báo của thư viện',
+  'publish.keepToken': 'Giữ mã thông báo hiện tại',
   'publish.tokenTitle': 'Token của thư viện',
   'publish.tokenHelp':
     'Token từ hồ sơ trong thư viện, với quyền "Tải lên và xuất bản", do quản trị viên của thư viện tạo ở đó. Được giữ trong Trình quản lý thông tin xác thực của Windows trên máy tính này.',

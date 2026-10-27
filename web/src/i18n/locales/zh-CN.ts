@@ -46,6 +46,8 @@ const words: Record<MessageKey, string> = {
   'publish.itemsToPublish': '{count} 项待发布',
   'publish.noApproved': '没有已批准的项目',
   'publish.save': '保存',
+  'publish.replaceToken': '替换媒体库的令牌',
+  'publish.keepToken': '保留当前令牌',
   'publish.tokenTitle': '媒体库的令牌',
   'publish.tokenHelp':
     '由媒体库的管理员在个人资料中创建的令牌，权限为“上传和发布”。保存在此电脑的 Windows 凭据管理器中。',
