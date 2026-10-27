@@ -2,7 +2,8 @@
  * The page the studio opens in a hidden window to render a variant (src-tauri/src/render). For a
  * design, it converts the variant's HTML files, one for each language of its request, with the
  * app's engine, checks them, and shows each language at full size and as the gallery's thumbnail
- * (`<lang>-full`, `<lang>-thumb`). For a template's sample in a language, it builds every slide on
+ * (`<lang>-full`, `<lang>-thumb`), and at the size the galleries show it, the picture of it made
+ * ahead that is published with it (`<lang>-gallery`). For a template's sample in a language, it builds every slide on
  * the template with the app's engine, checks them, and shows each at full size and as a thumbnail
  * (`s01-full`, `s01-thumb`…), and all of them on one sheet (`sheet`). When everything is drawn it
  * tells Rust the views it drew (`[data-snap]`), and Rust takes a picture of each.
@@ -29,6 +30,8 @@ import { registerLibraryFonts } from './fonts';
 import { convertTemplate, type Built, type TemplateInput, type TemplateResult } from './template';
 
 const THUMB_WIDTH = 384;
+/** The width of a design's picture made ahead for the galleries (ADR-111 of the app). */
+const GALLERY_WIDTH = 320;
 const SHEET_COLUMNS = 4;
 
 /** What the page said went wrong, beside the error that stopped it. */
@@ -150,6 +153,15 @@ function Views({ result, picture }: { result: DesignResult; picture: Picture }) 
                 deck={deck}
                 slide={slide}
                 width={THUMB_WIDTH}
+                mode="thumbnail"
+                resolveAsset={resolve}
+              />
+            </div>
+            <div data-snap={`${lang}-gallery`} style={{ width: GALLERY_WIDTH }}>
+              <ScaledSlide
+                deck={deck}
+                slide={slide}
+                width={GALLERY_WIDTH}
                 mode="thumbnail"
                 resolveAsset={resolve}
               />

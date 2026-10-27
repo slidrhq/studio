@@ -86,9 +86,21 @@ pub fn design_tags(value: Option<&Value>) -> Option<Tags> {
     Some(tags)
 }
 
+/// The size of the picture of a design's slide that the galleries show, made ahead (ADR-109 and
+/// ADR-111 of the app): what the render draws as `<lang>-gallery`, and the library takes as
+/// `thumb-<lang>`.
+const GALLERY: (u32, u32) = (320, 180);
+/// How good a picture made ahead is, of a hundred: as the app made the pictures of its designs.
+const GALLERY_QUALITY: f32 = 85.0;
+
 /// The picture as the library keeps it: lossy WebP at the quality the studio has always used, with
 /// its alpha when it has one; and its size.
 pub fn to_webp(png: &Path) -> Result<(Vec<u8>, (u32, u32)), String> {
+    webp_at(png, 86.0)
+}
+
+/// A picture as lossy WebP at `quality`, with its alpha when it has one; and its size.
+fn webp_at(png: &Path, quality: f32) -> Result<(Vec<u8>, (u32, u32)), String> {
     let failed = |e: &dyn std::fmt::Display| format!("{}: {e}", png.display());
     let image = image::ImageReader::open(png)
         .and_then(image::ImageReader::with_guessed_format)
@@ -97,7 +109,7 @@ pub fn to_webp(png: &Path) -> Result<(Vec<u8>, (u32, u32)), String> {
         .map_err(|e| failed(&e))?;
     let (width, height) = (image.width(), image.height());
     let mut config = webp::WebPConfig::new().map_err(|()| failed(&"no WebP encoder"))?;
-    config.quality = 86.0;
+    config.quality = quality;
     config.method = 6;
     let encoded = if image.color().has_alpha() {
         let rgba = image.to_rgba8();
@@ -132,6 +144,14 @@ pub struct Known {
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// A design as its upload takes it: what the library writes into `managed.json`, its picture, and
+/// the picture of each of its slides that the galleries show, by language.
+pub struct DesignUpload {
+    pub record: Value,
+    pub picture: Vec<u8>,
+    pub thumbs: Vec<(String, Vec<u8>)>,
 }
 
 pub struct Library {
@@ -274,18 +294,40 @@ impl Library {
 
     /* -------------------------------------------------------------- the work, as uploads */
 
-    fn last_result(&self, variant: &Variant) -> Option<Value> {
+    /// The folder of a variant's last render.
+    fn last_render(&self, variant: &Variant) -> Option<std::path::PathBuf> {
         let revision = variant
             .render
             .as_ref()
             .map(|render| render.revision)
             .filter(|r| *r > 0)?;
-        read_json::<Value>(&render_dir(&self.store.work_dir(variant), revision).join("result.json"))
-            .filter(Value::is_object)
+        Some(render_dir(&self.store.work_dir(variant), revision))
     }
 
-    /// A design as its last render made it, and its picture as WebP.
-    pub fn design_record(&self, variant: &Variant) -> Result<(Value, Vec<u8>), String> {
+    fn last_result(&self, variant: &Variant) -> Option<Value> {
+        read_json::<Value>(&self.last_render(variant)?.join("result.json")).filter(Value::is_object)
+    }
+
+    /// The pictures of a design's slides that the galleries show, as its last render drew them
+    /// (`<lang>-gallery.png`), as WebP: one for each of `langs` it drew at their size. A render
+    /// from before the studio drew them has none, and the galleries draw those slides live.
+    fn gallery_pictures(&self, variant: &Variant, langs: &[String]) -> Vec<(String, Vec<u8>)> {
+        let Some(dir) = self.last_render(variant) else {
+            return Vec::new();
+        };
+        langs
+            .iter()
+            .filter_map(|lang| {
+                let png = dir.join(format!("{lang}-gallery.png"));
+                let (webp, size) = webp_at(&png, GALLERY_QUALITY).ok()?;
+                (size == GALLERY).then(|| (lang.clone(), webp))
+            })
+            .collect()
+    }
+
+    /// A design as its last render made it, its picture as WebP, and the pictures of its slides
+    /// that the galleries show.
+    pub fn design_record(&self, variant: &Variant) -> Result<DesignUpload, String> {
         let did = variant.design_id.clone().unwrap_or_default();
         let result = self
             .last_result(variant)
@@ -309,6 +351,7 @@ impl Library {
                 "{did}: its last render has no Hebrew or English slide."
             ));
         }
+        let langs: Vec<String> = slides.keys().cloned().collect();
         let (webp, (width, height)) = to_webp(&self.store.work_dir(variant).join("subject.png"))?;
         let brief = variant
             .brief
@@ -332,7 +375,11 @@ impl Library {
         if let Some(tags) = design_tags(tags.as_ref()) {
             record["tags"] = json!(tags);
         }
-        Ok((record, webp))
+        Ok(DesignUpload {
+            thumbs: self.gallery_pictures(variant, &langs),
+            record,
+            picture: webp,
+        })
     }
 
     /// A template's sample in one language, as its last render built it.
@@ -373,10 +420,20 @@ impl Library {
                 }
             } else {
                 match self.design_record(&variant) {
-                    Ok((record, webp)) => api
-                        .send(&design_upload(&record), &[("picture", &webp, "image/webp")])
-                        .await
-                        .map_err(|e| (e.message, e.issues)),
+                    Ok(design) => {
+                        let names: Vec<String> = design
+                            .thumbs
+                            .iter()
+                            .map(|(lang, _)| format!("thumb-{lang}"))
+                            .collect();
+                        let mut files = vec![("picture", design.picture.as_slice(), "image/webp")];
+                        for (name, (_, data)) in names.iter().zip(&design.thumbs) {
+                            files.push((name.as_str(), data.as_slice(), "image/webp"));
+                        }
+                        api.send(&design_upload(&design.record), &files)
+                            .await
+                            .map_err(|e| (e.message, e.issues))
+                    }
                     Err(error) => Err((error, Vec::new())),
                 }
             };
@@ -562,7 +619,20 @@ mod tests {
         let result =
             |sides: &Value| json!({"publishable": true, "langs": sides, "subject": [5, 6]});
         write_json(&work.join("renders/r1/result.json"), &result(&sides)).expect("written");
-        let (record, webp) = library.design_record(&variant).expect("a record");
+        // The pictures the galleries show of its slides, as the render drew them: one of another
+        // size is not one of them, and a slide drawn without is drawn live there.
+        png(&work.join("renders/r1/he-gallery.png"), 320, 180);
+        png(&work.join("renders/r1/zh-CN-gallery.png"), 320, 180);
+        png(&work.join("renders/r1/en-gallery.png"), 384, 216);
+        let design = library.design_record(&variant).expect("a record");
+        let thumbs: Vec<&str> = design
+            .thumbs
+            .iter()
+            .map(|(lang, _)| lang.as_str())
+            .collect();
+        assert_eq!(thumbs, ["he", "zh-CN"]);
+        assert_eq!(&design.thumbs[0].1[8..12], b"WEBP");
+        let (record, webp) = (design.record, design.picture);
         let order: Vec<&String> = record["slides"]
             .as_object()
             .map(|s| s.keys().collect())
@@ -582,7 +652,7 @@ mod tests {
                 en: vec!["Invitation".into(), "party".into(), "event".into()],
             };
         }
-        let (record, _) = library.design_record(&tagged).expect("a record");
+        let record = library.design_record(&tagged).expect("a record").record;
         assert_eq!(
             record["tags"],
             json!({"he": ["הזמנה", "מסיבה", "אירוע"], "en": ["invitation", "party", "event"]})

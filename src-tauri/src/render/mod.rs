@@ -12,6 +12,7 @@
 //! ```text
 //! work/renders/r<n>/<lang>-full.png    1920×1080 (he-full.png, en-full.png, ar-full.png…)
 //! work/renders/r<n>/<lang>-thumb.png   384 px wide, as the gallery shows a design
+//! work/renders/r<n>/<lang>-gallery.png 320×180, the picture made ahead that is published with it
 //! work/renders/r<n>/result.json        the slides, findings, conversion notes, subject point
 //! ```
 //!
