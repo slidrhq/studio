@@ -7,6 +7,7 @@ mod codex;
 mod commands;
 mod config;
 mod files;
+mod gallery;
 mod instructions;
 #[cfg(windows)]
 #[allow(unsafe_code)]
@@ -71,6 +72,8 @@ pub fn run() {
         commands::library_upload,
         commands::library_settings,
         commands::library_statuses,
+        commands::gallery_missing,
+        commands::gallery_draw,
         commands::render_input,
         commands::capture_clip,
         commands::render_done,

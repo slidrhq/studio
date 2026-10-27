@@ -166,6 +166,19 @@ export interface UploadItem {
   issues?: { path: string; message: string; language?: string }[];
 }
 
+/** The slides of the published designs that the library has no picture of (src-tauri/src/gallery.rs). */
+export interface GalleryMissing {
+  slides: number;
+  designs: number;
+}
+
+/** What a drawing of the galleries' pictures did: an upload of each design, and what failed. */
+export interface GalleryDrawn {
+  missing: number;
+  uploads: (Omit<UploadItem, 'variantId'> & { id: string; langs: string[] })[];
+  failed: { id: string; lang: string; error: string }[];
+}
+
 export interface LibraryInfo {
   groups: { id: string; he?: string; en?: string }[];
   ids: string[];
@@ -304,6 +317,8 @@ export const api = {
     call<{ items: UploadItem[] }>('library_upload', { variantIds: variantIds ?? null }),
   librarySettings: (token: string, url = '') =>
     call<{ url: string; token: boolean }>('library_settings', { token, url }),
+  galleryMissing: () => call<GalleryMissing>('gallery_missing'),
+  galleryDraw: () => call<GalleryDrawn>('gallery_draw'),
 };
 
 /** A file of a variant's working folder, through the studio's `studio:` protocol. */

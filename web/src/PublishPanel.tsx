@@ -4,6 +4,8 @@ import {
   api,
   isTemplate,
   renderPicture,
+  type GalleryDrawn,
+  type GalleryMissing,
   type ServerStatus,
   type UploadItem,
   type Variant,
@@ -57,6 +59,94 @@ function Outcome({ item, library }: { item: UploadItem; library: string }) {
         </ul>
       )}
     </div>
+  );
+}
+
+/**
+ * The pictures of the published designs that the galleries show, drawn where the library lacks
+ * them (src-tauri/src/gallery.rs): how many are missing, and each design's upload of those drawn.
+ */
+function GallerySection({ hasToken, library }: { hasToken: boolean; library: string }) {
+  const t = useT();
+  const [missing, setMissing] = useState<GalleryMissing>();
+  const [drawn, setDrawn] = useState<GalleryDrawn>();
+  const [error, setError] = useState<string>();
+  const [busy, setBusy] = useState(false);
+
+  const look = () =>
+    api.galleryMissing().then(
+      (found) => setMissing(found),
+      (failure: unknown) => setError(message(failure)),
+    );
+  useEffect(() => void look(), []);
+
+  const draw = () => {
+    setBusy(true);
+    setError(undefined);
+    api
+      .galleryDraw()
+      .then(
+        (done) => {
+          setDrawn(done);
+          return look();
+        },
+        (failure: unknown) => setError(message(failure)),
+      )
+      .finally(() => setBusy(false));
+  };
+
+  return (
+    <section>
+      <h3>{t('publish.galleryTitle')}</h3>
+      <p className="muted small">{t('publish.galleryHelp')}</p>
+      {missing && (
+        <p className="small">
+          {missing.slides
+            ? t('publish.galleryMissing', { slides: missing.slides, designs: missing.designs })
+            : t('publish.galleryNone')}
+        </p>
+      )}
+      {drawn && (
+        <div className="publish-items">
+          {drawn.uploads.map((upload) => (
+            <figure key={upload.id}>
+              <figcaption>
+                <span dir="ltr">{upload.id}</span>
+                <span className="muted" dir="ltr">
+                  {upload.langs.join(' · ')}
+                </span>
+              </figcaption>
+              <Outcome item={{ ...upload, variantId: upload.id }} library={library} />
+            </figure>
+          ))}
+        </div>
+      )}
+      {drawn && drawn.failed.length > 0 && (
+        <details className="small">
+          <summary className="error-text">
+            {t('publish.galleryFailed', { count: drawn.failed.length })}
+          </summary>
+          <ul className="paths" dir="ltr">
+            {drawn.failed.map((one) => (
+              <li key={`${one.id}.${one.lang}`}>
+                <code>
+                  {one.id}.{one.lang}
+                </code>{' '}
+                {one.error}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+      {error && <p className="error-text">{error}</p>}
+      <div className="form-actions">
+        <button type="button" disabled={!hasToken || busy || !missing?.slides} onClick={draw}>
+          {busy
+            ? t('publish.galleryDrawing')
+            : t('publish.galleryDraw', { count: missing?.slides ?? 0 })}
+        </button>
+      </div>
+    </section>
   );
 }
 
@@ -237,6 +327,8 @@ export function PublishPanel({
               </button>
             </div>
           </section>
+
+          <GallerySection hasToken={hasToken} library={library} />
         </div>
       </div>
     </div>

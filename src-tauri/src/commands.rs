@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 use tauri::{State, WebviewWindow, ipc::Response};
 
 use crate::{
-    languages,
+    gallery, languages,
     pipeline::Studio,
     programs,
     render::{self, Done, Rect, Renders},
@@ -326,6 +326,31 @@ pub async fn library_statuses(studio: State<'_, Arc<Studio>>, variant_ids: Vec<S
     Ok(json!({"items": studio.library.statuses(&variant_ids).await}))
 }
 
+/* ------------------------------------------------------------------ the galleries' pictures */
+
+/// How many slides of the published designs the library has no picture of, and of how many designs.
+#[tauri::command]
+pub async fn gallery_missing(studio: State<'_, Arc<Studio>>) -> Answer {
+    let missing = studio.library.gallery_missing().await?;
+    let mut designs: Vec<&str> = missing.iter().map(|slide| slide.id.as_str()).collect();
+    designs.dedup();
+    Ok(json!({"slides": missing.len(), "designs": designs.len()}))
+}
+
+/// Draws the slides of the published designs that the library has no picture of, and sends the
+/// pictures to it (`gallery.rs`).
+#[tauri::command]
+pub async fn gallery_draw(
+    studio: State<'_, Arc<Studio>>,
+    renders: State<'_, Arc<Renders>>,
+) -> Answer {
+    if studio.settings.remote().library_token.is_none() {
+        return Err("The studio has no token of the library yet: save one first.".into());
+    }
+    let work = studio.settings.data.join("gallery");
+    gallery::draw(&studio.library, &renders, &work).await
+}
+
 /* ------------------------------------------------------------------ the render windows */
 
 fn from_render_window(window: &WebviewWindow) -> Answer<()> {
@@ -344,8 +369,10 @@ pub async fn render_input(
     studio: State<'_, Arc<Studio>>,
 ) -> Answer {
     from_render_window(&window)?;
-    let vid = renders.begin(&window).await?;
-    studio.render_input(&vid)
+    match renders.begin(&window).await? {
+        (_, Some(input)) => Ok(input),
+        (vid, None) => studio.render_input(&vid),
+    }
 }
 
 /// A picture of a rectangle of the render page, for the conversion engine's fidelity guard. The

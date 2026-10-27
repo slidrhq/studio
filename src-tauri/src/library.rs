@@ -12,6 +12,7 @@
 //! published.
 
 use std::{
+    collections::BTreeMap,
     path::Path,
     sync::{Arc, Mutex, MutexGuard, PoisonError},
     time::{Duration, Instant},
@@ -22,13 +23,14 @@ use serde_json::{Map, Value, json};
 
 use crate::{
     config::Settings,
+    gallery::{self, Drawn, Missing},
     languages::{BASE_LANGUAGES, CONTENT_LANGUAGES},
     net::{self, FetchError},
     prompts::{items, truthy},
     render::render_dir,
     store::{Published, Store, Tags, Upload, Variant, now, read_json},
     templates::Templates,
-    uploads::{LibraryApi, Transport, design_upload, https, sample_upload},
+    uploads::{LibraryApi, Transport, design_upload, drawing_upload, https, sample_upload},
 };
 
 pub const MANAGED: &str = "elements/designs/managed.json";
@@ -89,9 +91,9 @@ pub fn design_tags(value: Option<&Value>) -> Option<Tags> {
 /// The size of the picture of a design's slide that the galleries show, made ahead (ADR-109 and
 /// ADR-111 of the app): what the render draws as `<lang>-gallery`, and the library takes as
 /// `thumb-<lang>`.
-const GALLERY: (u32, u32) = (320, 180);
+pub const GALLERY: (u32, u32) = (320, 180);
 /// How good a picture made ahead is, of a hundred: as the app made the pictures of its designs.
-const GALLERY_QUALITY: f32 = 85.0;
+pub const GALLERY_QUALITY: f32 = 85.0;
 
 /// The picture as the library keeps it: lossy WebP at the quality the studio has always used, with
 /// its alpha when it has one; and its size.
@@ -100,7 +102,7 @@ pub fn to_webp(png: &Path) -> Result<(Vec<u8>, (u32, u32)), String> {
 }
 
 /// A picture as lossy WebP at `quality`, with its alpha when it has one; and its size.
-fn webp_at(png: &Path, quality: f32) -> Result<(Vec<u8>, (u32, u32)), String> {
+pub fn webp_at(png: &Path, quality: f32) -> Result<(Vec<u8>, (u32, u32)), String> {
     let failed = |e: &dyn std::fmt::Display| format!("{}: {e}", png.display());
     let image = image::ImageReader::open(png)
         .and_then(image::ImageReader::with_guessed_format)
@@ -486,16 +488,7 @@ impl Library {
         if published {
             *lock(&self.known) = None;
         }
-        // Why it waits: the publication that could not run, the tries that failed, or the note of
-        // one sent back.
-        let note = [
-            answer.pointer("/publishing/failed/message"),
-            answer.pointer("/publication/message"),
-            answer.get("note"),
-        ]
-        .into_iter()
-        .flatten()
-        .find_map(Value::as_str);
+        let note = why_it_waits(answer);
         json!({
             "variantId": vid,
             "uploadId": id,
@@ -503,6 +496,58 @@ impl Library {
             "note": note,
             "missing": answer.get("missing").cloned().unwrap_or_else(|| json!([])),
         })
+    }
+
+    /* -------------------------------------------------------------- the galleries' pictures */
+
+    /// The slides of the published designs that the library has no picture of, as they are
+    /// (`gallery.rs`).
+    pub async fn gallery_missing(&self) -> Result<Vec<Missing>, String> {
+        let manifest = self
+            .published_json(gallery::MANIFEST)
+            .await?
+            .ok_or("The library has no manifest: it is not published.")?;
+        let revs = self.published_json(gallery::REVS).await?;
+        let thumbs = self.published_json(gallery::THUMBS).await?;
+        gallery::missing(&manifest, revs.as_ref(), thumbs.as_ref())
+    }
+
+    /// Sends the pictures drawn of each design's slides as `designs: draw`, one upload a design.
+    /// Each item says the design, its languages, and its upload and status, or why the library did
+    /// not take it.
+    pub async fn send_drawings(&self, drawn: BTreeMap<String, Vec<Drawn>>) -> Vec<Value> {
+        let api = self.api();
+        let mut results = Vec::new();
+        for (id, slides) in drawn {
+            let words: Vec<(String, String)> = slides
+                .iter()
+                .map(|(lang, word, _)| (lang.clone(), word.clone()))
+                .collect();
+            let names: Vec<String> = slides
+                .iter()
+                .map(|(lang, _, _)| format!("thumb-{lang}"))
+                .collect();
+            let files: Vec<(&str, &[u8], &str)> = names
+                .iter()
+                .zip(&slides)
+                .map(|(name, (_, _, webp))| (name.as_str(), webp.as_slice(), "image/webp"))
+                .collect();
+            let langs: Vec<&str> = words.iter().map(|(lang, _)| lang.as_str()).collect();
+            let item = match api.send(&drawing_upload(&id, &words), &files).await {
+                Ok(answer) => json!({
+                    "id": id,
+                    "langs": langs,
+                    "uploadId": answer.get("id").cloned().unwrap_or(Value::Null),
+                    "status": answer.get("status").cloned().unwrap_or(Value::Null),
+                    "note": why_it_waits(&answer),
+                }),
+                Err(error) => {
+                    json!({"id": id, "langs": langs, "error": error.message, "issues": error.issues})
+                }
+            };
+            results.push(item);
+        }
+        results
     }
 
     /// The status of the uploads these variants were sent as, as the library has them now.
@@ -526,6 +571,19 @@ impl Library {
         }
         results
     }
+}
+
+/// Why an upload waits: the publication that could not run, the tries that failed, or the note of
+/// one sent back.
+fn why_it_waits(answer: &Value) -> Option<&str> {
+    [
+        answer.pointer("/publishing/failed/message"),
+        answer.pointer("/publication/message"),
+        answer.get("note"),
+    ]
+    .into_iter()
+    .flatten()
+    .find_map(Value::as_str)
 }
 
 #[cfg(test)]
@@ -719,6 +777,38 @@ mod tests {
             other.upload.and_then(|u| u.status).as_deref(),
             Some("accepted")
         );
+    }
+
+    #[tokio::test]
+    async fn drawings_go_a_design_an_upload_with_the_words_they_were_drawn_of() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let pages = Pages::new(&[(
+            "POST",
+            "/api/uploads",
+            201,
+            json!({"id": "u-9", "status": "published"}),
+        )]);
+        let (library, _) = library(dir.path(), Arc::clone(&pages) as Arc<dyn Transport>);
+        let drawn = BTreeMap::from([(
+            "m-party".to_owned(),
+            vec![
+                ("he".to_owned(), "h1".to_owned(), b"RIFF-he".to_vec()),
+                ("zh-CN".to_owned(), "z1".to_owned(), b"RIFF-zh".to_vec()),
+            ],
+        )]);
+        let items = library.send_drawings(drawn).await;
+        assert_eq!(
+            items,
+            [
+                json!({"id": "m-party", "langs": ["he", "zh-CN"], "uploadId": "u-9",
+                    "status": "published", "note": null})
+            ]
+        );
+        let sent = pages.sent.lock().expect("the log")[0].clone();
+        let body = String::from_utf8_lossy(&sent.2);
+        assert!(body.contains(r#""action":"draw""#) && body.contains(r#""id":"m-party""#));
+        assert!(body.contains(r#""zh-CN":{"word":"z1"}"#));
+        assert!(body.contains(r#"name="thumb-zh-CN""#) && body.contains("RIFF-zh"));
     }
 
     #[tokio::test]

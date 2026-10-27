@@ -194,6 +194,9 @@ async fn fix_metrics(_window: &WebviewWindow) -> Result<(), String> {
 
 struct Waiting {
     vid: String,
+    /// What the page draws when it is not a variant: the pictures of published designs that the
+    /// galleries show (`gallery.rs`).
+    input: Option<Value>,
     done: Option<oneshot::Sender<Done>>,
 }
 
@@ -222,6 +225,25 @@ impl Renders {
 
     /// Renders revision `revision` of a variant into `out`; the page's result.
     pub async fn draw(&self, vid: &str, revision: u32, out: &Path) -> Result<Value, String> {
+        let job = json!({"vid": vid, "revision": revision});
+        let title = format!("Slidr Studio · render {vid} r{revision}");
+        self.run(vid, None, job, &title, out).await
+    }
+
+    /// Has the page draw `input`, which says what it is (`kind`), into `out`; the page's result.
+    pub async fn draw_input(&self, input: Value, title: &str, out: &Path) -> Result<Value, String> {
+        let title = format!("Slidr Studio · {title}");
+        self.run("", Some(input), json!({}), &title, out).await
+    }
+
+    async fn run(
+        &self,
+        vid: &str,
+        input: Option<Value>,
+        job: Value,
+        title: &str,
+        out: &Path,
+    ) -> Result<Value, String> {
         let _ = fs::remove_dir_all(out);
         fs::create_dir_all(out).map_err(|e| format!("{}: {e}", out.display()))?;
         let label = format!("{PREFIX}{}", self.next.fetch_add(1, Ordering::Relaxed));
@@ -230,13 +252,13 @@ impl Renders {
             label.clone(),
             Waiting {
                 vid: vid.to_owned(),
+                input,
                 done: Some(sender),
             },
         );
-        let job = json!({"vid": vid, "revision": revision});
         let built =
             WebviewWindowBuilder::new(&self.app, &label, WebviewUrl::App("render.html".into()))
-                .title(format!("Slidr Studio · render {vid} r{revision}"))
+                .title(title)
                 .visible(self.show)
                 .focused(false)
                 .skip_taskbar(!self.show)
@@ -295,19 +317,21 @@ impl Renders {
         Ok(result)
     }
 
-    /// The variant a render window's page is rendering; refused to any other window.
-    fn variant_of(&self, label: &str) -> Result<String, String> {
+    /// What a render window's page is rendering: a variant, or its input; refused to any other
+    /// window.
+    fn job_of(&self, label: &str) -> Result<(String, Option<Value>), String> {
         lock(&self.waiting)
             .get(label)
-            .map(|waiting| waiting.vid.clone())
+            .map(|waiting| (waiting.vid.clone(), waiting.input.clone()))
             .ok_or_else(|| format!("{label} is not rendering anything"))
     }
 
-    /// Sets the page's metrics and says which variant it renders: the first thing the page asks.
-    pub async fn begin(&self, window: &WebviewWindow) -> Result<String, String> {
-        let vid = self.variant_of(window.label())?;
+    /// Sets the page's metrics and says what it renders, a variant or the input it was given: the
+    /// first thing the page asks.
+    pub async fn begin(&self, window: &WebviewWindow) -> Result<(String, Option<Value>), String> {
+        let job = self.job_of(window.label())?;
         fix_metrics(window).await?;
-        Ok(vid)
+        Ok(job)
     }
 
     /// The page's answer. One for a render that already timed out is dropped.

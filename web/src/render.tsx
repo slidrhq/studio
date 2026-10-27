@@ -6,7 +6,9 @@
  * ahead that is published with it (`<lang>-gallery`). For a template's sample in a language, it builds every slide on
  * the template with the app's engine, checks them, and shows each at full size and as a thumbnail
  * (`s01-full`, `s01-thumb`…), and all of them on one sheet (`sheet`). When everything is drawn it
- * tells Rust the views it drew (`[data-snap]`), and Rust takes a picture of each.
+ * tells Rust the views it drew (`[data-snap]`), and Rust takes a picture of each. And it draws slides
+ * of published designs as the galleries show them, for the pictures of them the library lacks
+ * (`gallery.tsx`).
  *
  * The engine compares its result with the HTML it converts, by pictures of the page: Rust takes
  * them (`capture_clip`), as the app's capture window does, so a part that would not look the same
@@ -27,11 +29,10 @@ import {
   type Picture,
 } from './design';
 import { registerLibraryFonts } from './fonts';
+import { GALLERY_WIDTH, runGallery, type GalleryItem, type GalleryResult } from './gallery';
 import { convertTemplate, type Built, type TemplateInput, type TemplateResult } from './template';
 
 const THUMB_WIDTH = 384;
-/** The width of a design's picture made ahead for the galleries (ADR-111 of the app). */
-const GALLERY_WIDTH = 320;
 const SHEET_COLUMNS = 4;
 
 /** What the page said went wrong, beside the error that stopped it. */
@@ -187,11 +188,14 @@ function views() {
   });
 }
 
-async function run(): Promise<DesignResult | TemplateResult> {
+async function run(): Promise<DesignResult | TemplateResult | GalleryResult> {
   // Rust first sets the page to 1920×1080, one device pixel each, then hands over the variant.
   const read = await invoke<{ kind?: string; id: string }>('render_input');
   await registerLibraryFonts();
   if (read.kind === 'template') return runTemplate(read as unknown as TemplateInput);
+  if (read.kind === 'gallery') {
+    return runGallery((read as unknown as { items: GalleryItem[] }).items);
+  }
   const input = read as unknown as {
     id: string;
     designId: string;

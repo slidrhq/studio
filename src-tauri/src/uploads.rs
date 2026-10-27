@@ -87,6 +87,16 @@ pub fn sample_upload(template_id: &str, lang: &str, sample: Value) -> Value {
     })
 }
 
+/// The pictures of a published design's slides drawn again, as the library's `designs: draw` takes
+/// them: each language with the word of the slide its picture (`thumb-<lang>`) is of.
+pub fn drawing_upload(id: &str, words: &[(String, String)]) -> Value {
+    let languages: Map<String, Value> = words
+        .iter()
+        .map(|(lang, word)| (lang.clone(), json!({"word": word})))
+        .collect();
+    json!({"type": "designs", "action": "draw", "id": id, "languages": languages})
+}
+
 /// A form of the upload as JSON (`upload`) and its files, each by its name; and its type.
 pub fn multipart(upload: &Value, files: &[(&str, &[u8], &str)]) -> (Vec<u8>, String) {
     let boundary = format!("slidr-studio-{}", uuid::Uuid::new_v4().simple());
