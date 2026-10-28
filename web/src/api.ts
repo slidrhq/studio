@@ -184,8 +184,6 @@ export interface GalleryDrawn {
 export interface LibraryInfo {
   groups: { id: string; he?: string; en?: string }[];
   ids: string[];
-  managed: number;
-  authored: number;
   reachable: boolean;
 }
 

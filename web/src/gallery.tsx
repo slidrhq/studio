@@ -31,7 +31,7 @@ export interface GalleryResult {
 /** A catalog of designs in one language, as far as a drawing reads it. */
 interface Catalog {
   slides?: Record<string, Partial<Record<Lang, Slide>> | undefined>;
-  /** A managed design's pictures' sizes, by their names. */
+  /** Of a library of before, the sizes of the pictures of the studio's designs, by their names. */
   sizes?: Record<string, [number, number] | undefined>;
 }
 

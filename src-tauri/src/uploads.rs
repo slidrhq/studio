@@ -35,7 +35,7 @@ impl UploadError {
 
 /// A design of the studio, as the library's `designs: add` takes it.
 ///
-/// `record` is what the library writes into `managed.json` (`library::design_record`): its id,
+/// `record` is what the library writes into its catalog of the designs (`library::design_record`): its id,
 /// names, group, slides by language, subject, and its tags when it has them.
 pub fn design_upload(record: &Value) -> Value {
     let mut languages = Map::new();

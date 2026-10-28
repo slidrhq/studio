@@ -33,8 +33,11 @@ use crate::{
     uploads::{LibraryApi, Transport, design_upload, drawing_upload, https, sample_upload},
 };
 
-pub const MANAGED: &str = "elements/designs/managed.json";
+/// The catalog of the designs (ADR-118 of the app).
 pub const INDEX: &str = "elements/designs/index.json";
+/// The catalog of the designs the studio made, of a library not published since the two were
+/// made one: its next publication folds it into the other.
+pub const MANAGED: &str = "elements/designs/managed.json";
 /// Most search tags kept in a language, and fewest a language must have for any to be kept.
 const MOST_TAGS: usize = 20;
 const FEWEST_TAGS: usize = 3;
@@ -139,8 +142,6 @@ pub struct Group {
 pub struct Known {
     pub groups: Vec<Group>,
     pub ids: Vec<String>,
-    pub managed: usize,
-    pub authored: usize,
     pub reachable: bool,
 }
 
@@ -148,7 +149,7 @@ fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// A design as its upload takes it: what the library writes into `managed.json`, its picture, and
+/// A design as its upload takes it: what the library writes into its catalog, its picture, and
 /// the picture of each of its slides that the galleries show, by language.
 pub struct DesignUpload {
     pub record: Value,
@@ -239,23 +240,19 @@ impl Library {
                 .map(|slides| slides.keys().cloned().collect::<Vec<_>>())
                 .unwrap_or_default()
         };
-        if let Some(index) = index.as_ref().filter(|i| i.is_object()) {
-            ids.extend(slides_of(Some(index)));
-            for group in items(index.get("groups")).iter().filter_map(Value::as_str) {
-                groups.push(Group {
-                    id: group.to_owned(),
-                    he: None,
-                    en: None,
-                });
-            }
-        }
-        if let Some(managed) = managed.as_ref().filter(|m| m.is_object()) {
-            ids.extend(slides_of(Some(managed)));
-            for group in items(managed.get("groups"))
+        // The catalog names the groups of the designs made since the first ones, whose names the
+        // app's messages hold; a catalog of before, those of the studio's.
+        for catalog in [index.as_ref(), managed.as_ref()]
+            .into_iter()
+            .flatten()
+            .filter(|c| c.is_object())
+        {
+            ids.extend(slides_of(Some(catalog)));
+            for group in items(catalog.get("groups"))
                 .iter()
                 .filter_map(Value::as_str)
             {
-                let names = managed.pointer(&format!("/groupNames/{group}"));
+                let names = catalog.pointer(&format!("/groupNames/{group}"));
                 let name = |lang: &str| {
                     names
                         .and_then(|n| n.get(lang))
@@ -286,8 +283,6 @@ impl Library {
         let known = Known {
             groups,
             ids,
-            managed: slides_of(managed.as_ref()).len(),
-            authored: slides_of(index.as_ref()).len(),
             reachable,
         };
         *lock(&self.known) = Some((Instant::now(), known.clone()));

@@ -39,14 +39,15 @@ pub struct Missing {
     pub lang: String,
     /// The word of the slide, as `revs.json` gives it.
     pub word: String,
-    /// The catalog that has it: `index.json`, the app's own designs, or `managed.json`.
+    /// The catalog that has it: `index.json`; or `managed.json`, of a library of before, for a
+    /// design the studio made.
     pub catalog: String,
 }
 
-/// The catalog a design is in, when `revs.json` does not say: the designs made outside the app are
-/// named `m-…`.
-fn catalog_by_name(id: &str) -> &'static str {
-    if id.starts_with("m-") {
+/// The catalog a design is in, when `revs.json` does not say: the one catalog; or, of a library of
+/// before, which still has the studio's (`legacy`), that one for the designs it made, `m-…`.
+fn catalog_by_name(id: &str, legacy: bool) -> &'static str {
+    if legacy && id.starts_with("m-") {
         "managed.json"
     } else {
         "index.json"
@@ -79,6 +80,7 @@ pub fn missing(
     {
         return Ok(None);
     }
+    let legacy = files.contains_key(crate::library::MANAGED);
     let mut catalog_of: BTreeMap<&str, &str> = BTreeMap::new();
     if let Some(catalogs) = revs
         .and_then(|revs| revs.get("catalogs"))
@@ -117,7 +119,7 @@ pub fn missing(
                 catalog: catalog_of
                     .get(id.as_str())
                     .copied()
-                    .unwrap_or_else(|| catalog_by_name(id))
+                    .unwrap_or_else(|| catalog_by_name(id, legacy))
                     .to_owned(),
             });
         }
@@ -266,6 +268,20 @@ mod tests {
             all.iter()
                 .any(|one| one.id == "cover" && one.catalog == "index.json")
         );
+    }
+
+    #[test]
+    fn a_library_of_one_catalog_has_every_design_in_it() {
+        let manifest = manifest(&[("elements/designs/index.json", "i1")]);
+        let revs = json!({
+            "from": {"elements/designs/index.json": "i1"},
+            "designs": {"he": {"cover": "c1", "m-party": "p1"}},
+        });
+        let all = missing(&manifest, Some(&revs), None)
+            .expect("the missing")
+            .expect("words of the library");
+        assert_eq!(all.len(), 2);
+        assert!(all.iter().all(|one| one.catalog == "index.json"));
     }
 
     #[test]

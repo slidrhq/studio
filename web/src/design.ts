@@ -1,7 +1,7 @@
 /**
  * A design of the Elements gallery, from the HTML files Claude wrote, one for each language of
  * its request (Hebrew and English always, and any other content language chosen), to the slides
- * the app's catalog holds (`elements/designs/managed.json`):
+ * the library's catalog holds (`elements/designs/index.json`):
  *
  * - converted by the app's own engine (`@slidr/html-import`), as the agent's slides are;
  * - made independent of any deck: text styles linked to the theme are written out on the runs,
