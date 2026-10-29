@@ -400,8 +400,9 @@ const listOf = (langs: readonly Lang[]) => {
 };
 
 /**
- * Converts and checks a design in each of its languages: `languages` (the request's, which the
- * studio sends), else those `html` has; Hebrew and English always.
+ * Converts and checks a design in each of its languages: exactly `languages` when the studio
+ * sends them (English alone while only the master design is made), else those `html` has, with
+ * Hebrew and English always.
  */
 export async function convertDesign(input: {
   designId: string;
@@ -412,7 +413,10 @@ export async function convertDesign(input: {
   debug?: boolean;
 }): Promise<DesignResult> {
   const convert = service(input.image);
-  const languages = designLanguages(input.languages ?? languagesOf(input.html));
+  const wanted = input.languages;
+  const languages = wanted?.length
+    ? CONTENT_LANGUAGES.filter((lang) => wanted.includes(lang))
+    : designLanguages(languagesOf(input.html));
   const langs = {} as Localized<LangResult>;
   for (const lang of languages) {
     const html = input.html[lang];
@@ -451,7 +455,7 @@ export async function convertDesign(input: {
   }
   const issues: string[] = [];
   let subject: [number, number] | null = null;
-  const en = langs.en.slide;
+  const en = (langs as Partial<Record<Lang, LangResult>>).en?.slide;
   const slides = Object.fromEntries(
     languages.flatMap((lang) => (langs[lang]?.slide ? [[lang, langs[lang].slide]] : [])),
   ) as Partial<Record<Lang, SlideModel>>;
@@ -461,10 +465,22 @@ export async function convertDesign(input: {
     if (!subject) {
       const ltr = languages.filter((lang) => languageDir(lang) === 'ltr');
       const rtl = languages.filter((lang) => languageDir(lang) === 'rtl');
+      const others = ltr.filter((lang) => lang !== 'en');
       issues.push(
-        languages.length === 2
-          ? 'No point of the picture lies on top in both languages at mirrored places: mirror the picture frame exactly between he.html and en.html, keep its <img> a direct child of the root, and let nothing cover the middle of its subject.'
-          : `No point of the picture lies on top in every language at the same place (mirrored in the right-to-left files): keep the picture frame where it is in en.html in ${listOf(ltr)}, mirror it exactly in ${listOf(rtl)}, keep its <img> a direct child of the root, and let nothing cover the middle of its subject.`,
+        languages.length === 1
+          ? `No point of the picture lies on top in ${fileOf(languages[0]!)}: keep its <img> a direct child of the root, and let nothing cover the middle of its subject.`
+          : languages.length === 2 && rtl.length === 1
+            ? `No point of the picture lies on top in both languages at mirrored places: mirror the picture frame exactly between ${fileOf(rtl[0]!)} and en.html, keep its <img> a direct child of the root, and let nothing cover the middle of its subject.`
+            : [
+                'No point of the picture lies on top in every language at the same place',
+                rtl.length ? ' (mirrored in the right-to-left files)' : '',
+                ': ',
+                others.length
+                  ? `keep the picture frame where it is in en.html in ${listOf(others)}, `
+                  : '',
+                rtl.length ? `mirror it exactly in ${listOf(rtl)}, ` : '',
+                'keep its <img> a direct child of the root, and let nothing cover the middle of its subject.',
+              ].join(''),
       );
     }
   }

@@ -1,25 +1,12 @@
-import type { VariantStatus } from './api';
 import type { MessageKey } from './i18n';
 
-/**
- * Labels are message keys: show one with `t(STATUS[status])`. Designs are shown in both
- * languages; the studio itself follows the language chosen.
- */
-export const STATUS: Record<VariantStatus, MessageKey> = {
-  queued: 'shell.statusQueued',
-  image: 'shell.statusImage',
-  writing: 'shell.statusWriting',
-  rendering: 'shell.statusRendering',
-  reviewing: 'shell.statusReviewing',
-  ready: 'shell.statusReady',
-  failed: 'shell.statusFailed',
-  cancelled: 'shell.statusCancelled',
-};
-
+/** What a variant waits for while it runs, as Rust names it (`variant.stage`). */
 export const STAGE: Record<string, MessageKey> = {
   'waiting for Claude': 'shell.stageWaitingClaude',
   'waiting for Codex': 'shell.stageWaitingCodex',
   'waiting for the browser': 'shell.stageWaitingBrowser',
+  'waiting for the agent': 'shell.stageWaitingAgent',
+  'waiting for the library': 'shell.stageWaitingLibrary',
 };
 
 /** Log kinds that are translated; `text` and `claude` are a product name (see `LOG_PLAIN`). */
@@ -35,23 +22,11 @@ export const LOG_KIND: Record<string, MessageKey | undefined> = {
 };
 
 /** Log kinds that are shown as a name, not translated. */
-export const LOG_PLAIN: Record<string, string> = { text: 'Claude', claude: 'Claude' };
-
-/** `labelKey` is a message key; `label` is a name that is not translated. */
-export const MODELS: { value: string; label?: string; labelKey?: MessageKey }[] = [
-  { value: '', labelKey: 'shell.modelDefault' },
-  { value: 'fable', label: 'Fable' },
-  { value: 'opus', label: 'Opus' },
-  { value: 'sonnet', label: 'Sonnet' },
-];
-
-export const EFFORTS: { value: string; labelKey: MessageKey }[] = [
-  { value: '', labelKey: 'shell.effortDefault' },
-  { value: 'medium', labelKey: 'shell.effortMedium' },
-  { value: 'high', labelKey: 'shell.effortHigh' },
-  { value: 'xhigh', labelKey: 'shell.effortXhigh' },
-  { value: 'max', labelKey: 'shell.effortMax' },
-];
+export const LOG_PLAIN: Record<string, string> = {
+  text: 'Claude',
+  claude: 'Claude',
+  codex: 'Codex',
+};
 
 /** The time of day in the language shown (Hebrew when none is given). */
 export const time = (seconds: number, lang = 'he') =>

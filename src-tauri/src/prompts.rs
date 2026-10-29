@@ -6,14 +6,20 @@
 //! contract the app's catalog and its tests hold a design to (`desktop/src/elements/
 //! designs.test.ts`), and how the studio's files and turns work.
 //!
-//! Every prompt names the languages of its request (`languages.rs`): one HTML file per language,
-//! Hebrew and English always, and only the other languages the person chose for that request.
+//! A design is made in two stages, by two agents (`agents.rs`). The design agent makes the English
+//! design, the master (`en.html` alone: its prompts are those of the language list `["en"]`). Once
+//! the person approves it, the translation agent writes it in every other language of the app,
+//! each a file of its own in the master's composition, with the design's names and search tags in
+//! those languages (`translation_*`). A design from before there were stages was written in all its
+//! languages at once, and its prompts name them all.
 
 use serde_json::{Value, json};
 
 use crate::{
     instructions::{AppInstructions, Font, fonts_text},
-    languages::{BASE_LANGUAGES, direction, file_of, files, listing, name, names},
+    languages::{
+        BASE_LANGUAGES, CONTENT_LANGUAGES, direction, file_of, files, listing, name, names,
+    },
     library::Group,
     store::{DesignBrief, to_json_indented},
 };
@@ -87,6 +93,28 @@ pub fn show(value: Option<&Value>) -> String {
 /// The items of a JSON list; none when it is missing or is not one.
 pub fn items(value: Option<&Value>) -> &[Value] {
     value.and_then(Value::as_array).map_or(&[], Vec::as_slice)
+}
+
+/// Whether a prompt is of an English master alone.
+pub fn is_master(langs: &[String]) -> bool {
+    langs.len() == 1 && langs[0] == "en"
+}
+
+/// Every content language of the app, English among them.
+pub fn all_languages() -> Vec<String> {
+    CONTENT_LANGUAGES
+        .iter()
+        .map(|lang| (*lang).to_owned())
+        .collect()
+}
+
+/// The languages a master is written in afterwards: every content language but English.
+pub fn other_languages() -> Vec<String> {
+    CONTENT_LANGUAGES
+        .iter()
+        .filter(|lang| **lang != "en")
+        .map(|lang| (*lang).to_owned())
+        .collect()
 }
 
 fn only_base(langs: &[String]) -> bool {
@@ -172,6 +200,20 @@ fn fit_notes(langs: &[String]) -> Vec<String> {
 
 /// The first rule of the contract: which files to write, and how they mirror each other.
 pub fn files_rule(langs: &[String]) -> String {
+    if is_master(langs) {
+        let longer = names(&LONGER.map(str::to_owned), "and");
+        return format!(
+            "- **One file: the English master.** Write `en.html` alone (`dir=\"ltr\" lang=\"en\"`), \
+             and no file in any other language. Once the person approves it, the design is written \
+             from it in every other language of the app ({}), each a file of its own: every \
+             left-to-right one keeps your composition, every right-to-left one (Hebrew, Arabic) is \
+             its mirror, and a language changes only what its text needs to fit. Compose for that: \
+             give every block of text room to grow by a third ({longer} run longer), let nothing \
+             depend on English capitals, on an English pun, or on a line break only English has, \
+             and place the picture so that its mirror works as well.",
+            names(&other_languages(), "and")
+        );
+    }
     if only_base(langs) {
         return "- **Two files, one design.** This request is made in Hebrew and English only: \
                 write `he.html` and `en.html`, and no file in any other language (a deck in another \
@@ -239,8 +281,16 @@ pub fn system_prompt(
     langs: &[String],
     with_html: bool,
 ) -> String {
+    let all = all_languages();
+    let master = is_master(langs);
+    let published_in = if master {
+        "sixteen languages (English first: the master you design, which the others are written from)"
+            .to_owned()
+    } else {
+        names(langs, "and")
+    };
     let mut parts = vec![
-        ROLE.replace("{languages}", &names(langs, "and")),
+        ROLE.replace("{languages}", &published_in),
         format!("{QUALITY_HEADER}\n\n{quality}"),
         PRECEDENCE.to_owned(),
         app.design.clone(),
@@ -249,7 +299,8 @@ pub fn system_prompt(
         parts.push(app.html.clone());
     }
     parts.push(CONTRACT.replace("{files_rule}", &files_rule(langs)));
-    parts.push(fonts_text(fonts, langs));
+    // A master's families must have counterparts in the letters of the languages to come.
+    parts.push(fonts_text(fonts, if master { &all } else { langs }));
     if with_html {
         parts.push(WORKFLOW.replace("{files}", &files(langs)));
     }
@@ -271,15 +322,15 @@ fn base() -> Vec<String> {
         .collect()
 }
 
-/// The search tags of a design, in Hebrew and English (ADR-108 of the app).
-pub fn tags_schema() -> Value {
+/// The search tags of a design in `langs` (ADR-108 of the app).
+pub fn tags_schema(langs: &[String]) -> Value {
     let words =
         json!({"type": "array", "minItems": 6, "maxItems": 20, "items": {"type": "string"}});
-    json!({
-        "type": "object",
-        "required": BASE_LANGUAGES,
-        "properties": {"he": words.clone(), "en": words},
-    })
+    let properties: serde_json::Map<String, Value> = langs
+        .iter()
+        .map(|lang| (lang.clone(), words.clone()))
+        .collect();
+    json!({"type": "object", "required": langs, "properties": properties})
 }
 
 /// The plan's shape: the copy in every language of the request; the names and the search tags in
@@ -303,7 +354,7 @@ pub fn plan_schema(langs: &[String]) -> Value {
                         "name": texts(&base()),
                         "group": slug(30),
                         "groupName": texts(&base()),
-                        "tags": tags_schema(),
+                        "tags": tags_schema(&if is_master(langs) { langs.to_vec() } else { base() }),
                         "concept": {"type": "string"},
                         "art": {"type": "string"},
                         "copy": texts(langs),
@@ -376,15 +427,57 @@ pub fn plan_prompt(
                        and a floor of quality, not the whole repertoire, unless it asks for \
                        exactly that. Say the composition in the first sentence of `art`.";
     let codes = listing(langs.iter().map(|lang| format!("`{lang}`")), "and");
-    let names_only = if only_base(langs) {
+    let master = is_master(langs);
+    let names_only = if master || only_base(langs) {
         ""
     } else {
         "; the gallery names its designs in these two languages only"
     };
-    let fonts_for = if only_base(langs) {
+    let fonts_for = if master {
+        " (families with counterparts in the letters of the languages to come)"
+    } else if only_base(langs) {
         ""
     } else {
         " (for the letters of each of the design's languages)"
+    };
+    let made_in = if master {
+        "Each design is made first in English, its master, and in no other language now: once the \
+         person approves it, it is written in the app's other fifteen languages from it."
+            .to_owned()
+    } else {
+        format!(
+            "Each design is made in {}, and in no other language.",
+            names(langs, "and")
+        )
+    };
+    let tags_line = if master {
+        "- `tags`: the words people type into the gallery's search to find it, 8 to 16 in English, \
+         the most telling first: what it is for (the kind of slide, the occasion or event, the \
+         field, the people it addresses) and their synonyms; in lower case, one to three words \
+         each. Not its style, colours or picture, and not the subject of its sample copy unless \
+         the design is made for it (a birthday invitation is for birthdays). The tags of the other \
+         languages are written with them."
+    } else {
+        "- `tags`: the words people type into the gallery's search to find it, 8 to 16 in Hebrew \
+         and 8 to 16 in English, the most telling first: what it is for (the kind of slide, the \
+         occasion or event, the field, the people it addresses) and their synonyms. Each language \
+         written natively, with the spellings people type (יום הולדת, יומולדת); English in lower \
+         case, Hebrew without niqqud; one to three words each. Not its style, colours or picture, \
+         and not the subject of its sample copy unless the design is made for it (a birthday \
+         invitation is for birthdays)."
+    };
+    let copy_line = if master {
+        "- `copy`: the words of the slide in English (`en`), block by block (title, the line under \
+         it, details, call to action). Original and specific, and not so tied to English that it \
+         cannot be written natively in another language."
+            .to_owned()
+    } else {
+        format!(
+            "- `copy`: the words of the slide in each language of the design, under its code \
+             ({codes}), block by block (title, the line under it, details, call to action). \
+             Original and specific; each language written natively for its own readers, not \
+             translated word for word from another."
+        )
     };
     let taken = if taken.is_empty() {
         "none".to_owned()
@@ -400,7 +493,7 @@ pub fn plan_prompt(
 
 {composition}
 
-Each design is made in {}, and in no other language.
+{made_in}
 
 The groups of the gallery:
 {group_lines}
@@ -411,24 +504,23 @@ For each concept:
 - `slug`: a short English id (lowercase words joined by hyphens).
 - `name`: what the gallery calls it, in Hebrew and in English (two to four words{names_only}).
 - `group`, `groupName`: its group's id and, for a new group, its name in Hebrew and in English (for an existing one, repeat its names, or your best names for it).
-- `tags`: the words people type into the gallery's search to find it, 8 to 16 in Hebrew and 8 to 16 in English, the most telling first: what it is for (the kind of slide, the occasion or event, the field, the people it addresses) and their synonyms. Each language written natively, with the spellings people type (יום הולדת, יומולדת); English in lower case, Hebrew without niqqud; one to three words each. Not its style, colours or picture, and not the subject of its sample copy unless the design is made for it (a birthday invitation is for birthdays).
+{tags_line}
 - `concept`: the idea and the focal point, in two or three sentences.
 - `art`: the art direction: the layout and where the picture sits, the palette as hex colours, the font families from the list and how they are used{fonts_for}, the purposeful details.
-- `copy`: the words of the slide in each language of the design, under its code ({codes}), block by block (title, the line under it, details, call to action). Original and specific; each language written natively for its own readers, not translated word for word from another.
+{copy_line}
 - `image`: the prompt and aspect of the picture, as the section on the picture describes.
 
 Answer with the plan only.",
         prompt.trim(),
-        names(langs, "and"),
     )
 }
 
 pub fn build_prompt(brief: &DesignBrief, image_size: (u32, u32), langs: &[String]) -> String {
     let (w, h) = image_size;
-    let every = if langs.len() == 2 {
-        "both files"
-    } else {
-        "every file"
+    let every = match langs.len() {
+        1 => "it",
+        2 => "both files",
+        _ => "every file",
     };
     format!(
         "<studio_design>
@@ -530,7 +622,9 @@ fn pictures(folder: &str, langs: &[String], kind: &str) -> String {
 }
 
 fn keep(langs: &[String]) -> &'static str {
-    if langs.len() == 2 {
+    if is_master(langs) {
+        "keep it a master the other languages can be written from"
+    } else if langs.len() == 2 {
         "keep them mirrored"
     } else {
         "keep every left-to-right file in the English composition and every right-to-left file its mirror"
@@ -545,10 +639,10 @@ pub fn review_prompt(
     langs: &[String],
 ) -> String {
     let count = 2 * langs.len();
-    let compare = if langs.len() == 2 {
-        "the two languages"
-    } else {
-        "the languages"
+    let compare = match langs.len() {
+        1 => "the two sizes",
+        2 => "the two languages",
+        _ => "the languages",
     };
     format!(
         "<studio_review round=\"{round}\" of=\"{rounds}\">
@@ -572,7 +666,11 @@ When the design is publication ready, change no file and reply READY. Otherwise 
 }
 
 pub fn feedback_prompt(feedback: &str, langs: &[String]) -> String {
-    let place = if only_base(langs) {
+    let place = if is_master(langs) {
+        "`en.html`, the English master (the other languages are written from it once it is \
+         approved)"
+            .to_owned()
+    } else if only_base(langs) {
         "both `he.html` and `en.html` (mirrored, the Hebrew still natural Hebrew)".to_owned()
     } else {
         format!(
@@ -606,6 +704,132 @@ Look at {} and the thumbnails in that folder, and fix the errors above in {} wit
         findings_text(result, langs),
         fulls.join(", "),
         files(langs),
+    )
+}
+
+/* ------------------------------------------------------------------ the other languages */
+
+const TRANSLATION_ROLE: &str = "# Slidr Studio: a design of the Elements gallery in every language
+
+You are the localization art director of Slidr's Elements gallery. Slidr is a desktop presentation editor; Elements → Designs offers ready-made slides that a user inserts into a deck with one click, then edits. Every design is published in the app's sixteen languages, and a deck in any of them gets the design written for its readers.
+
+The design's English file, `en.html`, is its master: it was designed, reviewed and approved. You write the design in every other language, each a file of its own and a design in its own right: the master's composition, with copy written natively for the language's readers (not translated word for word), set in the language's own fonts, fitted to its letters. The app converts each file with its own engine, renders it, runs its design check, and shows you the result before anyone else sees it.";
+
+const TRANSLATION_WORKFLOW: &str = "## This folder
+
+You work in a folder of your own, and your file tools reach only it: `brief.json` (the concept, with the English copy, name and search tags), `subject.png` (the picture), `en.html` (the approved master: read it, never change it), the files you write ({files}, and `localized.json`), and `renders/` (the app's renders, a folder for each revision). You have no shell. Write complete files.
+
+`localized.json` holds the design's words beside its slides, in each language you write:
+
+```json
+{\"names\": {\"<lang>\": \"…\"}, \"tags\": {\"<lang>\": [\"…\"]}}
+```
+
+- `names`: what the gallery calls the design in the language, two to four words, as the English `name` of `brief.json` is in English.
+- `tags`: the words people type into the gallery's search, in that language, to find it: 8 to 16, the most telling first, as the English `tags` of `brief.json` are in English. What it is for (the kind of slide, the occasion, the field, the people it addresses) and the synonyms people type, written natively with the spellings people use, each one to three words in the language's own letters (figures alone are fine: 16:9), none twice. Hebrew without niqqud. Not its style, colours or picture, and never a word for how it is drawn (icon, illustration, sticker).";
+
+/// The system prompt of the translation agent: the app's guidelines and conventions, the gallery's
+/// contract for the files of every language, the fonts of every language, and its folder.
+pub fn translation_system_prompt(app: &AppInstructions, quality: &str, fonts: &[Font]) -> String {
+    let all = all_languages();
+    let others = other_languages();
+    [
+        TRANSLATION_ROLE.to_owned(),
+        format!("{QUALITY_HEADER}\n\n{quality}"),
+        PRECEDENCE.to_owned(),
+        app.design.clone(),
+        app.html.clone(),
+        CONTRACT.replace("{files_rule}", &files_rule(&all)),
+        fonts_text(fonts, &all),
+        TRANSLATION_WORKFLOW.replace("{files}", &files(&others)),
+    ]
+    .join("\n\n")
+}
+
+/// The first turn of a batch of languages: write their files, and their names and tags.
+pub fn translation_prompt(brief: &DesignBrief, langs: &[String], master: &str) -> String {
+    let codes = listing(langs.iter().map(|lang| format!("`{lang}`")), "and");
+    format!(
+        "<studio_translation>
+{}
+</studio_translation>
+
+The English design, `en.html`, is approved. Write it in {} now:
+
+1. Read `en.html` and look at `{master}` (the master as the app drew it) and `subject.png`.
+2. Write {}: each a complete design that follows the contract: the master's composition, kept in every left-to-right file and mirrored in every right-to-left one, the picture's frame where the contract puts it; the copy written natively for its readers, of the same meaning and tone as the English and fitted to the blocks; each text set in the counterpart of the master's family for the language's letters. Never change `en.html`.
+3. Add {codes} to `localized.json` (write it when it is not there; keep the languages it has): the design's name and its search tags in each, as the folder's section describes.
+4. Reply in one line with what you made.",
+        to_json_indented(brief),
+        names(langs, "and"),
+        files(langs),
+    )
+}
+
+/// A review round of the other languages: their renders and findings; the master stays.
+pub fn translation_review_prompt(
+    result: &Value,
+    round: u32,
+    rounds: u32,
+    folder: &str,
+    langs: &[String],
+) -> String {
+    let others: Vec<String> = langs.iter().filter(|lang| *lang != "en").cloned().collect();
+    format!(
+        "<studio_review round=\"{round}\" of=\"{rounds}\">
+The app converted every file with its engine and rendered the slides: {} at 1920×1080, and the thumbnails the gallery shows beside them (`{folder}/<lang>-thumb.png`, 384 px wide). Look at the full render of every language with a finding below, and at each of the others closely enough to judge it against the master (`{folder}/en-full.png`).
+
+{}
+
+Fix every error above in the files of the other languages, and whatever the pictures show falls short of the master: overflow, awkward wraps, clipping, a line left with one word, mistakes of direction, a text set in the wrong family, a picture frame out of place. Findings of `en.html` are of the approved master: leave them. Never change `en.html`; keep `localized.json` up to date when a change concerns it.
+
+When every language is publication ready, change no file and reply READY. Otherwise reply in one line with what you changed.
+</studio_review>",
+        pictures(folder, &others, "full"),
+        findings_text(result, langs),
+    )
+}
+
+/// After a render that broke the contract: fix the other languages, never the master.
+pub fn translation_fix_prompt(result: &Value, folder: &str, langs: &[String]) -> String {
+    format!(
+        "<studio_check>
+The app rendered the languages. {}
+
+Look at the full renders of the languages named above (`{folder}/<lang>-full.png`) and fix their errors in their files, without changing `en.html`. When nothing needs fixing, change no file and reply READY.
+</studio_check>",
+        findings_text(result, langs),
+    )
+}
+
+/// A change the person asked for in a whole design: first to the design agent, for the master.
+pub fn master_change_prompt(feedback: &str) -> String {
+    format!(
+        "<studio_feedback>
+{}
+</studio_feedback>
+
+The person reviewing this design, now written in every language from your English master, asks for the change above. When it concerns the design itself (its layout, its type, its colours, its picture, its words in English), make it in `en.html` (and `brief.json` when it concerns the picture, the name or the tags), keep everything else that works, and reply in one line with what you changed: the other languages are then written again from it. When it concerns only the wording or the fit of some other languages, change no file and reply LANGUAGES.",
+        feedback.trim()
+    )
+}
+
+/// The same change, to the translation agent: bring the other languages in line.
+pub fn translation_change_prompt(feedback: &str, master_changed: bool, langs: &[String]) -> String {
+    let others: Vec<String> = langs.iter().filter(|lang| *lang != "en").cloned().collect();
+    let what = if master_changed {
+        "The master `en.html` was changed for it (and `brief.json`, when the change concerned the name or the tags). Bring every other language's file in line with the master as it is now, each still natural to its readers, and update `localized.json` where the names or the tags should change."
+    } else {
+        "The master stays as it is. Make the change in the files of the languages it concerns, and in `localized.json` when it concerns the names or the tags."
+    };
+    format!(
+        "<studio_feedback>
+{}
+</studio_feedback>
+
+The person reviewing this design asks for the change above. {what} The files are {}. Never change `en.html`. Reply in one line with what you changed.",
+        feedback.trim(),
+        files(&others),
     )
 }
 
@@ -870,6 +1094,57 @@ pub mod tests {
         assert_eq!(
             plan_schema(&base_langs())["properties"]["concepts"]["items"]["properties"]["copy"]["required"],
             json!(["he", "en"])
+        );
+    }
+
+    #[test]
+    fn a_master_is_planned_and_written_in_english_alone() {
+        let en = langs(&["en"]);
+        let text = plan_prompt("a sale", Some(2), &[], &[], None, &en);
+        assert!(text.contains("Each design is made first in English, its master"));
+        assert!(text.contains("8 to 16 in English"));
+        assert!(!text.contains("8 to 16 in Hebrew"));
+        let schema = plan_schema(&en);
+        let item = &schema["properties"]["concepts"]["items"]["properties"];
+        assert_eq!(item["copy"]["required"], json!(["en"]));
+        assert_eq!(item["tags"]["required"], json!(["en"]));
+        assert_eq!(item["name"]["required"], json!(["he", "en"]));
+        let system = system_prompt(&app(), "QB", &the_fonts(), &en, true);
+        assert!(system.contains("**One file: the English master.**"));
+        assert!(system.contains("in sixteen languages (English first"));
+        // The families of the languages to come, so that the master's have counterparts.
+        assert!(system.contains("Cairo"));
+        assert!(system.contains("`en.html` (yours to write"));
+        let build = build_prompt(&DesignBrief::default(), (100, 50), &en);
+        assert!(build.contains("Write `en.html` in this folder"));
+        assert!(feedback_prompt("bigger", &en).contains("`en.html`, the English master"));
+    }
+
+    #[test]
+    fn the_other_languages_are_written_from_the_master_with_their_words() {
+        let others = other_languages();
+        assert_eq!(others.len(), 15);
+        assert!(!others.contains(&"en".to_owned()));
+        let system = translation_system_prompt(&app(), "QB", &the_fonts());
+        assert!(system.contains("`en.html` (the approved master: read it, never change it)"));
+        assert!(system.contains("`zh-CN.html`") && system.contains("`localized.json`"));
+        assert!(system.contains("DG") && system.contains("HC"));
+        let batch = langs(&["he", "ar", "de"]);
+        let text = translation_prompt(&DesignBrief::default(), &batch, "renders/r2/en-full.png");
+        assert!(text.contains("`he.html`, `ar.html` and `de.html`"));
+        assert!(text.contains("Add `he`, `ar` and `de` to `localized.json`"));
+        assert!(text.contains("renders/r2/en-full.png"));
+        let result = json!({"publishable": true, "langs": {
+            "en": {"issues": [], "findings": []},
+            "de": {"issues": [], "findings": [{"severity": "error", "rule": "L01", "message": "overflow"}]},
+        }});
+        let review = translation_review_prompt(&result, 1, 2, "renders/r3", &langs(&["en", "de"]));
+        assert!(review.contains("`renders/r3/de-full.png`") && !review.contains("en-thumb"));
+        assert!(review.contains("- de · error · L01: overflow"));
+        assert!(master_change_prompt("blue").contains("reply LANGUAGES"));
+        assert!(
+            translation_change_prompt("blue", true, &all_languages())
+                .contains("The master `en.html` was changed")
         );
     }
 

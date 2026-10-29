@@ -1,0 +1,44 @@
+/* The studio's stylesheet, as the app's (desktop/src/app.css): Tailwind with the Slidr design
+   tokens (vendor/packages/ui/src/theme.css). The interface is built of their classes; what is
+   here is what a class cannot say. */
+@import 'tailwindcss';
+@import '@slidr/ui/theme.css';
+
+#root {
+  height: 100%;
+}
+
+/* The title bar's gradient, as the app's. */
+.editor-header {
+  background-image: linear-gradient(
+    110deg,
+    var(--color-ui-header-start),
+    var(--color-ui-header-middle) 55%,
+    var(--color-ui-header-end)
+  );
+  color: var(--color-ui-header-fg);
+}
+
+.header-button {
+  color: var(--color-ui-header-fg);
+
+  &:hover {
+    background-color: var(--color-ui-header-hover);
+  }
+  &:active {
+    background-color: var(--color-ui-header-pressed);
+  }
+}
+
+/* A slide drawn by the app's renderer (SlideView): its own direction, and no line box under it. */
+.slide-frame {
+  width: 100%;
+  overflow: hidden;
+  line-height: 0;
+  direction: ltr;
+}
+
+.slide-empty {
+  width: 100%;
+  background: var(--color-ui-field);
+}

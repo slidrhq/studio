@@ -1,21 +1,10 @@
 export const he = {
-  'publish.dialogLabel': 'פרסום',
-  'publish.title': 'פרסום לספריית המדיה',
-  'publish.close': 'סגור',
-  'publish.itemsToPublish': '{count} פריטים לפרסום',
-  'publish.noApproved': 'אין פריטים מאושרים',
   'publish.save': 'שמור',
   'publish.replaceToken': 'החלפת הטוקן של הספרייה',
   'publish.keepToken': 'השארת הטוקן הנוכחי',
   'publish.tokenTitle': 'הטוקן של הספרייה',
   'publish.tokenHelp':
     'טוקן מהפרופיל בספרייה, בהרשאת "העלאה ופרסום", שמנהל של הספרייה יוצר. נשמר במנהל האישורים של Windows במחשב הזה.',
-  'publish.upload': 'שליחת {count} לספרייה',
-  'publish.refused': 'הספרייה לא קיבלה אותו: {error}',
-  'publish.statusPublished': 'פורסם בספרייה',
-  'publish.statusPending': 'ממתין בספרייה לאישור',
-  'publish.statusAccepted': 'אושר, ממתין בספרייה לפרסום',
-  'publish.statusRejected': 'נדחה בספרייה',
   'publish.galleryTitle': 'תמונות הגלריה',
   'publish.galleryHelp':
     'תמונות 320×180 של שקפי העיצובים שבספרייה, כפי שהגלריות מציגות אותם. עיצוב שאין לו תמונה של השקף כפי שהוא עכשיו מצויר בגלריה בזמן אמת. הסטודיו מצייר את החסרות ושולח אותן לספרייה.',
@@ -30,23 +19,12 @@ export const he = {
 };
 
 export const en: typeof he = {
-  'publish.dialogLabel': 'Publish',
-  'publish.title': 'Publish to the media library',
-  'publish.close': 'Close',
-  'publish.itemsToPublish': '{count} items to publish',
-  'publish.noApproved': 'No approved items',
   'publish.save': 'Save',
   'publish.replaceToken': "Replace the library's token",
   'publish.keepToken': 'Keep the current token',
   'publish.tokenTitle': "The library's token",
   'publish.tokenHelp':
     "A token from the library's profile, of the publish scope, which an admin of the library makes there. Kept in Windows' Credential Manager on this computer.",
-  'publish.upload': 'Send {count} to the library',
-  'publish.refused': 'The library did not take it: {error}',
-  'publish.statusPublished': 'Published in the library',
-  'publish.statusPending': 'Waits in the library for approval',
-  'publish.statusAccepted': 'Accepted, waits in the library to be published',
-  'publish.statusRejected': 'Rejected in the library',
   'publish.galleryTitle': 'Gallery pictures',
   'publish.galleryHelp':
     "The 320 × 180 pictures of the library's designs that the galleries show. A design without a picture of its slide as it is now is drawn live in the gallery. The studio draws those missing and sends them to the library.",

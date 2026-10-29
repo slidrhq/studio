@@ -3,6 +3,12 @@
  * change it. Rust sends every change as a `studio` event; the window reads the whole state once
  * it listens. A variant's files (its picture, its renders) are read through the `studio:`
  * protocol (src-tauri/src/files.rs).
+ *
+ * The studio works in chats: each message the person sends either asks for work (a request,
+ * which makes variants: the outputs the display panel shows) or asks for a change to outputs it
+ * names. Three agents do the work, each chosen in the settings and, for one chat, in its
+ * composer: the design agent makes the English master, the images agent the pictures, and the
+ * translation agent the other fifteen languages and the template samples.
  */
 import { BASE_LANGUAGES, languagesOf } from '@slidr/model';
 import { convertFileSrc, invoke } from '@tauri-apps/api/core';
@@ -13,22 +19,78 @@ import type { TemplateResult } from './template';
 
 export type { Lang } from './design';
 /**
- * The language the studio shows its designs and the library in: any content language. The
- * library shows only the pieces written in it; the studio shows a variant not made in it in
- * English, as the app gives it to a deck in that language.
+ * The language the studio shows its designs in: any content language. A variant not made in it
+ * is shown in English, as the app gives it to a deck in that language.
  */
 export type DisplayLang = Lang;
 /** A name in the gallery: in Hebrew and English, whatever languages the design is made in. */
 export type Named = { he: string; en: string };
 
-/**
- * The languages a variant is made in: its own, else those of its render, else Hebrew and English
- * (a variant from before a request chose its languages).
- */
-export function languagesOfVariant(variant: Variant, result?: DesignResult): Lang[] {
-  if (variant.languages?.length) return variant.languages;
-  return result ? languagesOf(result.langs) : [...BASE_LANGUAGES];
+/* ---------------------------------------------------------------- agents and settings */
+
+export type AgentRole = 'design' | 'images' | 'translation';
+export type AgentProgram = 'claude' | 'codex';
+/** An empty model or effort is the program's default. Images take only Codex, without effort. */
+export interface AgentChoice {
+  program: AgentProgram;
+  model: string;
+  effort: string;
 }
+export type Agents = Record<AgentRole, AgentChoice>;
+export const AGENT_ROLES: readonly AgentRole[] = ['design', 'images', 'translation'];
+
+export interface StudioSettings {
+  agents: Agents;
+  /** Review rounds of every design and sample: 0 to 3. */
+  reviewRounds: number;
+}
+
+/** The agents a chat works with: its own choices over the settings. */
+export function agentsOf(settings: StudioSettings | undefined, chat?: Chat): Agents | undefined {
+  if (!settings) return undefined;
+  const own = chat?.agents ?? {};
+  return {
+    design: own.design ?? settings.agents.design,
+    images: own.images ?? settings.agents.images,
+    translation: own.translation ?? settings.agents.translation,
+  };
+}
+
+/* ---------------------------------------------------------------- chats */
+
+/**
+ * What the rail makes. Only designs and templates (and `auto`, a request in words the studio
+ * reads) can be made and published today; the library takes no new items of the others yet.
+ */
+export type ChatKind =
+  'auto' | 'design' | 'template' | 'cards' | 'frames' | 'shapes' | 'graphics' | 'emoji' | 'fonts';
+
+export interface ChatMessage {
+  id: string;
+  at: number;
+  role: 'user' | 'studio';
+  text: string;
+  /** The kind chosen on the rail when it was sent. */
+  kind?: ChatKind;
+  /** The outputs the message is about: a change asked for in words. */
+  refs?: string[];
+  /** The requests it started. */
+  requestIds?: string[];
+  /** What could not be done for some of its outputs. */
+  errors?: { variantId?: string; error: string }[];
+}
+
+export interface Chat {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  /** This chat's own agents, over the settings. */
+  agents?: Partial<Agents>;
+  messages: ChatMessage[];
+}
+
+/* ---------------------------------------------------------------- requests and variants */
 
 /**
  * What a request makes: designs for the gallery, or the sample of a built-in template in
@@ -50,16 +112,16 @@ export interface StudioRequest {
   model: string;
   effort: string;
   reviewRounds: number;
-  /**
-   * A design's: Hebrew and English, and the other languages asked for; none on a request from
-   * before. A template's: the languages its sample is written in, a variant each.
-   */
   languages?: Lang[];
   /** A template request's template, and what the person asked beyond writing it. */
   templateId?: string;
   instructions?: string;
   /** How the studio read a request in words. */
   route?: { kind: string; reason: string };
+  /** The chat it was asked in. */
+  chatId?: string;
+  /** The agents in force when it was asked. */
+  agents?: Agents;
   variantIds: string[];
   error: string | null;
   cost: number;
@@ -81,33 +143,51 @@ export interface LogEntry {
 }
 
 export type VariantStatus =
-  'queued' | 'image' | 'writing' | 'rendering' | 'reviewing' | 'ready' | 'failed' | 'cancelled';
+  | 'queued'
+  | 'image'
+  | 'writing'
+  | 'rendering'
+  | 'reviewing'
+  | 'translating'
+  | 'publishing'
+  | 'ready'
+  | 'failed'
+  | 'cancelled';
+
+/**
+ * A design's phase: the English master alone, then (once the master is approved) the other
+ * languages being made, then every language. None on a template's sample, and on a design from
+ * before (made in all its languages at once): taken as `full`.
+ */
+export type Phase = 'master' | 'translating' | 'full';
 
 export interface Variant {
   id: string;
   requestId: string;
   index: number;
-  /** A design (the default, and every variant from before there were kinds), or a template's
-   * sample in one language (`lang`, `templateId`), which has no design id. */
+  /** A design (the default), or a template's sample in one language (`lang`, `templateId`). */
   kind?: 'design' | 'template';
   designId: string | null;
   templateId?: string;
   lang?: Lang;
+  phase?: Phase;
   /** A design's concept; a template variant's task, whose `name` is the template's. */
   brief: {
     id?: string;
     name: Named;
+    /** The design's name in every language it has one in. */
+    names?: Partial<Record<Lang, string>>;
     group?: string;
     groupName?: Partial<Named>;
-    /** The words the gallery's search finds the design by (ADR-108 of the app). */
-    tags?: { he: string[]; en: string[] };
+    /** The words the gallery's search finds the design by, in any language (ADR-108). */
+    tags?: Partial<Record<Lang, string[]>>;
     concept?: string;
     art?: string;
     image?: { prompt: string; aspect: string };
     instructions?: string;
     rewrite?: boolean;
   };
-  /** The languages it is made in, its request's; none on a variant from before (`languagesOfVariant`). */
+  /** The languages it is to be made in. */
   languages?: Lang[];
   status: VariantStatus;
   stage: string | null;
@@ -129,10 +209,21 @@ export interface Variant {
   approved: boolean;
   discarded?: boolean;
   published: { at: number; revision: number } | null;
-  /** The upload it was sent to the library as, when it was (`POST /api/upload`). */
+  /** The upload it was sent to the library as, when it was. */
   upload?: { id: string; status?: string; at: number };
+  /** Why the last publication failed. */
+  publishError?: string | null;
   cost: number;
   updatedAt: number;
+}
+
+/**
+ * The languages a variant is made in: its own, else those of its render, else Hebrew and English
+ * (a variant from before a request chose its languages).
+ */
+export function languagesOfVariant(variant: Variant, result?: DesignResult): Lang[] {
+  if (variant.languages?.length) return variant.languages;
+  return result ? languagesOf(result.langs) : [...BASE_LANGUAGES];
 }
 
 export interface ProgramStatus {
@@ -151,17 +242,13 @@ export interface ServerStatus {
   library: { url: string; token: boolean };
 }
 
-/** What became of one approved item sent to the library's upload API. */
+/** What became of one item sent to the library's upload API. */
 export interface UploadItem {
   variantId: string;
-  /** The upload it is, in the library. */
   uploadId?: string;
-  /** pending, accepted, rejected or published: the library publishes it, or says why it waits. */
   status?: string;
-  /** Why it waits, when it does. */
   note?: string | null;
   missing?: string[];
-  /** Why the library did not take it, and each issue at its place. */
   error?: string;
   issues?: { path: string; message: string; language?: string }[];
 }
@@ -187,9 +274,20 @@ export interface LibraryInfo {
   reachable: boolean;
 }
 
+/** What approving an output did: started its translation, or its publication, or nothing. */
+export interface ApproveItem {
+  variantId: string;
+  action: 'translate' | 'publish' | 'skip';
+  error?: string;
+}
+
+/* ---------------------------------------------------------------- the store */
+
 interface State {
   requests: StudioRequest[];
   variants: Record<string, Variant>;
+  chats: Chat[];
+  settings?: StudioSettings;
   connected: boolean;
   loaded: boolean;
 }
@@ -200,12 +298,15 @@ const RUNNING: ReadonlySet<VariantStatus> = new Set([
   'writing',
   'rendering',
   'reviewing',
+  'translating',
+  'publishing',
 ]);
 export const isRunning = (variant: Variant) => RUNNING.has(variant.status);
 
 let state: State = {
   requests: [],
   variants: {},
+  chats: [],
   connected: false,
   loaded: false,
 };
@@ -225,24 +326,46 @@ async function call<T>(command: string, args?: Record<string, unknown>): Promise
   }
 }
 
+const byCreation = <T extends { createdAt: number }>(list: T[]) =>
+  [...list].sort((a, b) => a.createdAt - b.createdAt);
+
 async function load() {
   const data = await call<{
     requests: StudioRequest[];
     variants: Variant[];
+    chats?: Chat[];
   }>('studio_state');
   set({
-    requests: data.requests,
+    requests: byCreation(data.requests),
     variants: Object.fromEntries(data.variants.map((variant) => [variant.id, variant])),
+    chats: byCreation(data.chats ?? []),
     loaded: true,
   });
+  void call<{ settings: StudioSettings }>('settings_get').then(
+    ({ settings }) => set({ settings }),
+    () => undefined,
+  );
 }
 
 type StudioEvent =
   | { type: 'request'; request: StudioRequest }
   | { type: 'requestDeleted'; id: string }
-  | { type: 'variant'; variant: Variant };
+  | { type: 'variant'; variant: Variant }
+  | { type: 'chat'; chat: Chat }
+  | { type: 'chatDeleted'; id: string }
+  | { type: 'settings'; settings: StudioSettings };
 
 let listening = false;
+
+/** Where Slidr Library asks the studio to open a request and a variant (the local server). */
+export type OpenEvent = { tab?: string | null; v?: string | null };
+const openers = new Set<(open: OpenEvent) => void>();
+
+/** Hears Slidr Library ask for a request and a variant (src-tauri/src/local_server.rs). */
+export function onOpen(handler: (open: OpenEvent) => void): () => void {
+  openers.add(handler);
+  return () => openers.delete(handler);
+}
 
 function connect() {
   if (listening) return;
@@ -254,23 +377,35 @@ function connect() {
     },
     () => set({ connected: false }),
   );
-  // Slidr Library opens a request and a variant here (src-tauri/src/local_server.rs).
-  void listen<{ tab?: string | null; v?: string | null }>('open', ({ payload }) => {
-    const params = new URLSearchParams();
-    if (payload.tab) params.set('tab', payload.tab);
-    if (payload.v) params.set('v', payload.v);
-    location.hash = `#${params}`;
+  void listen<OpenEvent>('open', ({ payload }) => {
+    for (const handler of openers) handler(payload);
   });
 }
 
 function receive(event: StudioEvent) {
-  if (event.type === 'request') {
-    const others = state.requests.filter((request) => request.id !== event.request.id);
-    set({ requests: [...others, event.request].sort((a, b) => a.createdAt - b.createdAt) });
-  } else if (event.type === 'requestDeleted') {
-    set({ requests: state.requests.filter((request) => request.id !== event.id) });
-  } else {
-    set({ variants: { ...state.variants, [event.variant.id]: event.variant } });
+  switch (event.type) {
+    case 'request': {
+      const others = state.requests.filter((request) => request.id !== event.request.id);
+      set({ requests: byCreation([...others, event.request]) });
+      break;
+    }
+    case 'requestDeleted':
+      set({ requests: state.requests.filter((request) => request.id !== event.id) });
+      break;
+    case 'variant':
+      set({ variants: { ...state.variants, [event.variant.id]: event.variant } });
+      break;
+    case 'chat': {
+      const others = state.chats.filter((chat) => chat.id !== event.chat.id);
+      set({ chats: byCreation([...others, event.chat]) });
+      break;
+    }
+    case 'chatDeleted':
+      set({ chats: state.chats.filter((chat) => chat.id !== event.id) });
+      break;
+    case 'settings':
+      set({ settings: event.settings });
+      break;
   }
 }
 
@@ -287,20 +422,39 @@ export function useStudio(): State {
 
 /* ---------------------------------------------------------------- calls */
 
+export interface ChatSend {
+  chatId?: string;
+  text: string;
+  kind: ChatKind;
+  refs?: string[];
+  templateId?: string;
+  languages?: Lang[];
+  count?: number;
+}
+
 export const api = {
   status: () => call<ServerStatus>('studio_status'),
   library: (fresh = false) => call<LibraryInfo>('library_known', { fresh }),
   templates: (fresh = false) => call<{ templates: TemplateInfo[] }>('template_listing', { fresh }),
-  newRequest: (body: {
-    kind: RequestKind;
-    prompt: string;
-    templateId?: string;
-    group: string;
-    model: string;
-    effort: string;
-    reviewRounds: number;
-    languages: Lang[];
-  }) => call<StudioRequest>('request_new', { body }),
+  settings: () =>
+    call<{ settings: StudioSettings; library: { url: string; token: boolean } }>('settings_get'),
+  saveSettings: async (settings: StudioSettings) => {
+    const saved = await call<StudioSettings>('settings_set', { settings });
+    set({ settings: saved });
+    return saved;
+  },
+  send: async (body: ChatSend) => {
+    const chat = await call<Chat>('chat_send', { body });
+    receive({ type: 'chat', chat });
+    return chat;
+  },
+  chatAgents: async (chatId: string, agents: Partial<Agents> | null) => {
+    const chat = await call<Chat>('chat_agents', { chatId, agents });
+    receive({ type: 'chat', chat });
+    return chat;
+  },
+  deleteChat: (chatId: string) => call('chat_delete', { chatId }),
+  approveMany: (vids: string[]) => call<{ items: ApproveItem[] }>('variants_approve', { vids }),
   more: (rid: string, count: number) => call('request_more', { rid, count }),
   cancelRequest: (rid: string) => call('request_cancel', { rid }),
   deleteRequest: (rid: string) => call('request_delete', { rid }),
@@ -313,8 +467,6 @@ export const api = {
   /** The status of the uploads these variants were sent as, as the library has them now. */
   statuses: (variantIds: string[]) =>
     call<{ items: UploadItem[] }>('library_statuses', { variantIds }),
-  upload: (variantIds?: string[]) =>
-    call<{ items: UploadItem[] }>('library_upload', { variantIds: variantIds ?? null }),
   librarySettings: (token: string, url = '') =>
     call<{ url: string; token: boolean }>('library_settings', { token, url }),
   galleryMissing: () => call<GalleryMissing>('gallery_missing'),

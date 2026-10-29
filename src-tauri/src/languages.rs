@@ -115,27 +115,6 @@ fn all_codes() -> String {
     CONTENT_LANGUAGES.join(", ")
 }
 
-/// The languages a request asks for: the codes of the registry (in any case), Hebrew and English
-/// added, each once, in the registry's order. An unknown code is an error.
-pub fn parse<S: AsRef<str>>(codes: &[S]) -> Result<Vec<String>, String> {
-    let mut found = Vec::new();
-    let mut unknown = Vec::new();
-    for code in codes {
-        match canonical(code.as_ref()) {
-            Some(known) => found.push(known),
-            None => unknown.push(code.as_ref().to_owned()),
-        }
-    }
-    if !unknown.is_empty() {
-        return Err(format!(
-            "Unknown language {}; the languages are {}.",
-            unknown.join(", "),
-            all_codes()
-        ));
-    }
-    Ok(ordered(&found))
-}
-
 /// The languages of the registry among `codes` (in any case), each once, in the registry's order,
 /// and nothing added: the languages a template's sample is to be written in. An unknown code is
 /// an error.
@@ -297,17 +276,7 @@ mod tests {
     }
 
     #[test]
-    fn a_request_is_made_in_hebrew_and_english_unless_more_are_chosen() {
-        let none: [&str; 0] = [];
-        assert_eq!(parse(&none), Ok(base()));
-        // Hebrew and English always; each language once, in the registry's order, in its own case.
-        assert_eq!(
-            parse(&["ja", "ar", "JA", "pt-br", "en"]),
-            Ok(strings(&["he", "en", "ar", "pt-BR", "ja"]))
-        );
-        // A code the registry does not know is refused, not dropped.
-        assert!(parse(&["de", "xx"]).is_err_and(|e| e.contains("Unknown language xx")));
-        assert!(parse(&["zh-TW"]).is_err());
+    fn a_stored_request_is_made_in_hebrew_and_english_and_its_languages() {
         // What was stored is read leniently; nothing stored is Hebrew and English.
         assert_eq!(chosen(&[None, None]), base());
         let stored = strings(&["ko", "xx"]);

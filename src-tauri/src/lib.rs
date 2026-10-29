@@ -1,7 +1,9 @@
-//! The Tauri shell of Slidr Studio. The pages show the requests and variants and ask for the work;
-//! Rust keeps the requests, runs Claude Code and Codex, renders in hidden windows with the app's
-//! own engine, and sends the approved work to the library.
+//! The Tauri shell of Slidr Studio. The pages show the chats, the requests and their outputs, and
+//! ask for the work; Rust keeps them, runs the agents of each role (Claude Code, the Codex CLI),
+//! renders in hidden windows with the app's own engine, and publishes the approved work to the
+//! library.
 
+mod agents;
 mod claude;
 mod codex;
 mod commands;
@@ -25,6 +27,7 @@ mod prompts;
 mod render;
 mod secrets;
 mod store;
+mod tags;
 mod template_prompts;
 mod templates;
 mod updates;
@@ -39,6 +42,7 @@ use tauri::{
 use tauri_plugin_opener::OpenerExt;
 
 use crate::{
+    agents::Preferences,
     config::Settings,
     instructions::Instructions,
     library::Library,
@@ -56,9 +60,13 @@ pub fn run() {
     let handler = gate(tauri::generate_handler![
         commands::studio_status,
         commands::studio_state,
+        commands::settings_get,
+        commands::settings_set,
+        commands::chat_send,
+        commands::chat_agents,
+        commands::chat_delete,
         commands::library_known,
         commands::template_listing,
-        commands::request_new,
         commands::request_more,
         commands::request_cancel,
         commands::request_delete,
@@ -67,6 +75,7 @@ pub fn run() {
         commands::variant_refine,
         commands::variant_image,
         commands::variant_approve,
+        commands::variants_approve,
         commands::variant_discard,
         commands::variant_result,
         commands::library_upload,
@@ -169,9 +178,11 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&templates),
     ));
     let renders = Arc::new(Renders::new(app.clone(), settings.show_render));
+    let prefs = Arc::new(Preferences::load(agents::settings_file(&settings.data)));
     let studio = Arc::new(Studio::new(
         Arc::clone(&settings),
         store,
+        prefs,
         Arc::new(Instructions::new(settings.media_url.clone())),
         library,
         templates,

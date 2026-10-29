@@ -1,27 +1,28 @@
-//! The work of a request: a design request plans concepts and makes each one a design; a template
-//! request writes the sample deck of a built-in template in languages, a variant each.
+//! The work of the studio: the person's chats, the requests each message starts, and the variants
+//! of each request, the outputs the display panel shows.
 //!
 //! ```text
-//! design request ──plan (Claude, structured)──► N concepts ──► one variant each, side by side:
-//!   variant: picture (Codex) ─► HTML in each language of the request (Claude, looking at it)
-//!            ─► render + design check (a hidden window, the app's engine) ─► review rounds (Claude
-//!            looks at the renders and fixes) ─► ready: the person approves, or asks for a change
+//! a message in a chat ──► a request in it (or, about chosen outputs, a change of each)
+//!
+//! design request ──plan (design agent, structured)──► N concepts ──► one variant each, side by side:
+//!   master:  picture (images agent) ─► en.html (design agent, looking at it) ─► render + design
+//!            check (a hidden window, the app's engine) ─► review rounds ─► ready: the person
+//!            approves the English design, or asks for a change
+//!   approved: the other fifteen languages (translation agent, a few at a time, with the names and
+//!            search tags in each) ─► render every language ─► review rounds ─► ready: the person
+//!            approves, and it is published to the library at once
 //!
 //! template request ──► one variant for each language, side by side:
-//!   variant: the template, its digest and its English and Hebrew samples ─► <lang>.json (Claude)
-//!            ─► build with the app's engine, render every slide, design check ─► review rounds
-//!            ─► ready: the person approves, or asks for a change
+//!   variant: the template, its digest and its English and Hebrew samples ─► <lang>.json
+//!            (translation agent) ─► build with the app's engine, render every slide, design check
+//!            ─► review rounds ─► ready: approved, it is published at once
 //!
-//! a request in words (kind "auto") ──route (Claude, structured)──► a design or a template request
+//! a request in words (kind "auto") ──route (design agent, structured)──► a design or a template
 //! ```
 //!
-//! Each variant keeps one Claude conversation, so a review or a change asked for later is a turn of
-//! the same session, with everything it saw before.
-//!
-//! A design request names its languages (`languages.rs`): Hebrew and English always, and the others
-//! the person chose. Every concept of it is planned, written, rendered, reviewed and published in
-//! exactly those, one HTML file per language; a request without a choice is Hebrew and English. A
-//! template request names the languages its sample is to be written in (`templates.rs`).
+//! Each variant keeps a conversation of each agent that works on it, so a review or a change asked
+//! for later is a turn of the same session, with everything it saw before. The agents are the
+//! settings' (`agents.rs`), with the chat's own choices over them, as they are when a turn starts.
 //!
 //! A request's work and each variant's run as tasks of their own, stopped by a token: a stopped
 //! task drops what it was waiting on, which ends the program it ran (`programs.rs`).
@@ -39,30 +40,37 @@ use std::{
     time::Duration,
 };
 
+use serde::Deserialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use tokio::sync::Semaphore;
 use tokio_util::sync::CancellationToken;
 
 use crate::{
-    claude::{self, ClaudeCall},
+    agents::{self, Agents, OwnAgents, Preferences, Program, Role, Turn},
     codex::{self, CodexErrorKind},
     config::Settings,
     instructions::{self, Instructions, quality_bar},
     languages,
-    library::{Library, design_tags},
+    library::Library,
     prompts::{self, items, truthy},
     render::{forget_old, render_dir},
     store::{
-        Brief, DesignBrief, ImageBrief, ImageInfo, Named, NewVariant, RenderSummary, Request,
-        RequestKind, RequestStatus, Route, Store, Variant, VariantKind, VariantStatus, read_json,
-        write_json,
+        Brief, Chat, DesignBrief, ImageBrief, ImageInfo, Message, MessageError, Named, NewVariant,
+        Phase, RenderSummary, Request, RequestKind, RequestStatus, Route, Store, Variant,
+        VariantKind, VariantStatus, read_json, write_json,
     },
+    tags::clean_tags,
     template_prompts,
     templates::{TemplateInfo, Templates, sample_file, template_brief},
 };
 
-const TOOLS: [&str; 4] = ["Read", "Write", "Edit", "Glob"];
+/// Languages the translation agent writes in one turn.
+const TRANSLATION_BATCH: usize = 5;
+/// What the translation agent writes beside the files: the names and tags of its languages.
+const LOCALIZED: &str = "localized.json";
+/// The kinds of the rail the library cannot take new items of yet.
+const NOT_YET: [&str; 6] = ["cards", "frames", "shapes", "graphics", "emoji", "fonts"];
 
 /// What draws a variant's renders: the hidden windows of the studio, or a test's stand-in.
 pub trait Renderer: Send + Sync {
@@ -108,22 +116,13 @@ pub fn unique_id(slug: &str, taken: &mut HashSet<String>) -> String {
     candidate
 }
 
-/// The files Claude must write: a design's HTML file for each language, or a template's sample in
-/// the variant's language.
+/// The files an agent must write: a design's HTML file for each language, or a template's sample
+/// in the variant's language.
 pub fn outputs(variant: &Variant, langs: &[String]) -> Vec<String> {
     match (&variant.kind, &variant.lang) {
         (VariantKind::Template, Some(lang)) => vec![sample_file(lang)],
         _ => langs.iter().map(|lang| languages::file_of(lang)).collect(),
     }
-}
-
-/// The files Claude writes: its outputs, and a design's brief.
-pub fn watched(variant: &Variant, langs: &[String]) -> Vec<String> {
-    let mut files = outputs(variant, langs);
-    if !variant.is_template() {
-        files.push("brief.json".into());
-    }
-    files
 }
 
 /// The outputs that are not written yet.
@@ -134,18 +133,14 @@ pub fn missing_files(work: &Path, variant: &Variant, langs: &[String]) -> Vec<St
         .collect()
 }
 
-fn fingerprint(
-    work: &Path,
-    variant: &Variant,
-    langs: &[String],
-) -> HashMap<String, Option<String>> {
-    watched(variant, langs)
-        .into_iter()
+fn fingerprint(work: &Path, files: &[String]) -> HashMap<String, Option<String>> {
+    files
+        .iter()
         .map(|name| {
-            let hash = fs::read(work.join(&name))
+            let hash = fs::read(work.join(name))
                 .ok()
                 .map(|bytes| format!("{:x}", Sha256::digest(bytes)));
-            (name, hash)
+            (name.clone(), hash)
         })
         .collect()
 }
@@ -190,6 +185,11 @@ fn quoted(value: Option<&Value>) -> String {
     }
 }
 
+/// The languages of a design but English, in the registry's order.
+fn others_of(langs: &[String]) -> Vec<String> {
+    langs.iter().filter(|lang| *lang != "en").cloned().collect()
+}
+
 /// How a task ended.
 enum Ended {
     Done(Result<(), String>),
@@ -198,9 +198,43 @@ enum Ended {
 
 type Work = Pin<Box<dyn Future<Output = Result<(), String>> + Send>>;
 
+/// A message the person sends in a chat (`chat_send`).
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatSend {
+    #[serde(default)]
+    pub chat_id: Option<String>,
+    #[serde(default)]
+    pub text: String,
+    /// `auto`, `design`, `template`, or a kind of the rail the studio cannot make yet.
+    #[serde(default)]
+    pub kind: String,
+    /// The outputs the message is about: a change of each.
+    #[serde(default)]
+    pub refs: Vec<String>,
+    #[serde(default)]
+    pub template_id: Option<String>,
+    #[serde(default)]
+    pub languages: Vec<String>,
+    /// The designs to plan; none is as many as the words ask for.
+    #[serde(default)]
+    pub count: Option<u32>,
+}
+
+/// What an approval did to one variant.
+pub enum Approval {
+    /// The English master was approved: its other languages are being written.
+    Translate,
+    /// It is being published.
+    Publish,
+    /// Withdrawn.
+    Withdrawn,
+}
+
 pub struct Studio {
     pub settings: Arc<Settings>,
     pub store: Arc<Store>,
+    pub prefs: Arc<Preferences>,
     pub instructions: Arc<Instructions>,
     pub library: Arc<Library>,
     pub templates: Arc<Templates>,
@@ -208,6 +242,8 @@ pub struct Studio {
     claude_slots: Semaphore,
     codex_slots: Semaphore,
     render_slots: Semaphore,
+    /// One publication at a time: the library takes one upload of a part's tags at once.
+    publish_slots: Semaphore,
     /// The running work, by request or variant id.
     tasks: Mutex<HashMap<String, (u64, CancellationToken)>>,
     next_task: AtomicU64,
@@ -217,6 +253,7 @@ impl Studio {
     pub fn new(
         settings: Arc<Settings>,
         store: Arc<Store>,
+        prefs: Arc<Preferences>,
         instructions: Arc<Instructions>,
         library: Arc<Library>,
         templates: Arc<Templates>,
@@ -226,8 +263,10 @@ impl Studio {
             claude_slots: Semaphore::new(settings.max_claude),
             codex_slots: Semaphore::new(settings.max_codex),
             render_slots: Semaphore::new(settings.max_render),
+            publish_slots: Semaphore::new(1),
             settings,
             store,
+            prefs,
             instructions,
             library,
             templates,
@@ -355,6 +394,26 @@ impl Studio {
         self.store.request(&variant.request_id)
     }
 
+    /// The agents of a chat: the settings', with its own choices over them.
+    pub fn agents_of_chat(&self, cid: Option<&str>) -> Agents {
+        let own = cid
+            .and_then(|cid| self.store.chat(cid))
+            .and_then(|chat| chat.agents);
+        self.prefs.get().agents.with(own.as_ref())
+    }
+
+    /// The agents that work on a request now: those of its chat.
+    fn agents_of_request(&self, request: &Request) -> Agents {
+        self.agents_of_chat(request.chat_id.as_deref())
+    }
+
+    fn agents_of(&self, variant: &Variant) -> Agents {
+        match self.options(variant) {
+            Some(request) => self.agents_of_request(&request),
+            None => self.prefs.get().agents,
+        }
+    }
+
     /// The languages a variant is made in: a template variant's one language; a design's own, else
     /// its request's, else Hebrew and English (a variant from before there was a choice).
     pub fn languages_of(&self, variant: &Variant) -> Vec<String> {
@@ -363,6 +422,26 @@ impl Studio {
         }
         let request = self.options(variant).and_then(|request| request.languages);
         languages::chosen(&[variant.languages.as_ref(), request.as_ref()])
+    }
+
+    /// The languages a variant has, or is having, written and rendered now: a master's English
+    /// alone; every language of its other variants.
+    pub fn making(&self, variant: &Variant) -> Vec<String> {
+        if variant.is_master() {
+            vec!["en".to_owned()]
+        } else {
+            self.languages_of(variant)
+        }
+    }
+
+    /// The languages the design agent writes: a master's English (also once it is whole: the
+    /// translation agent writes the others); every language of a design from before.
+    fn design_languages(&self, variant: &Variant) -> Vec<String> {
+        if variant.phase.is_some() {
+            vec!["en".to_owned()]
+        } else {
+            self.languages_of(variant)
+        }
     }
 
     fn set(&self, vid: &str, status: VariantStatus, stage: Option<&str>) {
@@ -406,6 +485,22 @@ impl Studio {
         Ok((plan, design))
     }
 
+    /// The system prompt of the translation agent on a design.
+    async fn translation_system_file(&self, variant: &Variant) -> Result<PathBuf, String> {
+        let fonts = self.instructions.fonts().await?;
+        let path = self
+            .store
+            .variant_dir(variant)
+            .join("system-translation.md");
+        fs::create_dir_all(self.store.variant_dir(variant)).map_err(|e| e.to_string())?;
+        fs::write(
+            &path,
+            prompts::translation_system_prompt(instructions::app(), &quality_bar(), &fonts),
+        )
+        .map_err(|e| format!("{}: {e}", path.display()))?;
+        Ok(path)
+    }
+
     /// The system prompt of a template variant, for its template and language.
     async fn template_system_file(&self, variant: &Variant) -> Result<PathBuf, String> {
         let template = read_json::<Value>(&self.store.work_dir(variant).join("template.json"))
@@ -420,6 +515,165 @@ impl Studio {
         )
         .map_err(|e| format!("{}: {e}", path.display()))?;
         Ok(path)
+    }
+
+    /// One turn of an agent that only answers (a plan, a route), on a request.
+    async fn answer(
+        &self,
+        request: &Request,
+        prompt: String,
+        system: PathBuf,
+        schema: Value,
+        minutes: u64,
+    ) -> Result<agents::TurnResult, String> {
+        let choice = self.agents_of_request(request).design;
+        let folder = self.store.request_dir(&request.id).join("plan");
+        let mut turn = Turn::new(choice.clone(), prompt, folder, system);
+        turn.json_schema = Some(schema);
+        turn.timeout = Duration::from_secs(minutes * 60);
+        let _slot = self.slot(choice.program).await?;
+        agents::run(turn, |_, _| {}).await
+    }
+
+    async fn slot(&self, program: Program) -> Result<tokio::sync::SemaphorePermit<'_>, String> {
+        match program {
+            Program::Claude => self.claude_slots.acquire().await,
+            Program::Codex => self.codex_slots.acquire().await,
+        }
+        .map_err(|e| e.to_string())
+    }
+
+    /* -------------------------------------------------------------- chats */
+
+    /// A message of the person: a change of the outputs it is about, or a request in the chat.
+    /// The chat as it is then.
+    pub fn send(self: &Arc<Self>, body: ChatSend) -> Result<Chat, String> {
+        let text = body.text.trim().to_owned();
+        if text.chars().count() > 4000 {
+            return Err("A message may be at most 4000 characters.".into());
+        }
+        let kind = if body.kind.is_empty() {
+            "auto".to_owned()
+        } else {
+            body.kind.clone()
+        };
+        if NOT_YET.contains(&kind.as_str()) && body.refs.is_empty() {
+            return Err(format!(
+                "The library cannot take new {kind} yet, so the studio cannot make them."
+            ));
+        }
+        let request_kind = match kind.as_str() {
+            "auto" => RequestKind::Auto,
+            "design" => RequestKind::Design,
+            "template" => RequestKind::Template,
+            other if body.refs.is_empty() => return Err(format!("Unknown kind '{other}'.")),
+            _ => RequestKind::Auto,
+        };
+        if body.refs.is_empty() && request_kind != RequestKind::Template && text.chars().count() < 3
+        {
+            return Err("Say what to make.".into());
+        }
+        if !body.refs.is_empty() && text.chars().count() < 2 {
+            return Err("Say what to change.".into());
+        }
+        if body.refs.len() > 200 {
+            return Err("A message may be about at most 200 outputs.".into());
+        }
+        // A template request is held to its template before anything is made.
+        let template = if body.refs.is_empty() && request_kind == RequestKind::Template {
+            let id = body
+                .template_id
+                .clone()
+                .filter(|id| !id.is_empty())
+                .ok_or("Choose the template whose sample to write.")?;
+            Some(id)
+        } else {
+            None
+        };
+        let langs = languages::known(&body.languages)?;
+        if let Some(count) = body.count
+            && !(1..=prompts::MOST_CONCEPTS).contains(&count)
+        {
+            return Err(format!("Plan 1 to {} designs.", prompts::MOST_CONCEPTS));
+        }
+
+        let chat = match body.chat_id.as_deref().filter(|cid| !cid.is_empty()) {
+            Some(cid) => self.store.chat(cid).ok_or("No such chat.")?,
+            // A template's sample may be asked for without words: the chat is named after it.
+            None => self.store.create_chat(if text.is_empty() {
+                template.as_deref().unwrap_or_default()
+            } else {
+                &text
+            }),
+        };
+        let mut message = Message::user(text.clone(), Some(kind));
+        if body.refs.is_empty() {
+            let settings = self.prefs.get();
+            let agents = self.agents_of_chat(Some(&chat.id));
+            let mut request = Request::draft(request_kind, text.clone());
+            request.chat_id = Some(chat.id.clone());
+            request.title = crate::store::title_of(&text);
+            request.review_rounds = settings.review_rounds;
+            request.model.clone_from(&agents.design.model);
+            request.effort.clone_from(&agents.design.effort);
+            request.agents = Some(agents);
+            request.asked = body.count;
+            if let Some(template) = template {
+                request.template_id = Some(template);
+                request.instructions = Some(text.clone());
+                request.languages = Some(langs);
+            } else {
+                // A design is made in every language: English first.
+                request.languages = Some(prompts::all_languages());
+            }
+            let request = self.start_request(request)?;
+            message.request_ids.push(request.id);
+        } else {
+            for vid in &body.refs {
+                if let Err(error) = self.refine(vid, text.clone()) {
+                    message.errors.push(MessageError {
+                        variant_id: Some(vid.clone()),
+                        error,
+                    });
+                }
+            }
+            message.refs.clone_from(&body.refs);
+        }
+        self.store
+            .update_chat(&chat.id, |chat| {
+                chat.messages.push(message);
+                chat.clone()
+            })
+            .ok_or_else(|| "No such chat.".to_owned())
+    }
+
+    /// A chat's own choice of agents, or none (the settings').
+    pub fn set_chat_agents(&self, cid: &str, agents: Option<OwnAgents>) -> Result<Chat, String> {
+        let agents = agents.filter(|agents| !agents.is_empty());
+        if let Some(agents) = &agents {
+            agents.check()?;
+        }
+        self.store
+            .update_chat(cid, |chat| {
+                chat.agents = agents;
+                chat.clone()
+            })
+            .ok_or_else(|| "No such chat.".to_owned())
+    }
+
+    /// Forgets a chat, and stops and forgets its requests and their variants.
+    pub fn delete_chat(&self, cid: &str) {
+        let rids: Vec<String> = self
+            .store
+            .requests()
+            .into_iter()
+            .filter(|request| request.chat_id.as_deref() == Some(cid))
+            .map(|request| request.id)
+            .collect();
+        for rid in rids {
+            self.delete_request(&rid);
+        }
+        self.store.delete_chat(cid);
     }
 
     /* -------------------------------------------------------------- requests */
@@ -470,15 +724,16 @@ impl Studio {
         if self.request(&rid)?.kind == RequestKind::Auto {
             self.route(&rid).await?;
         }
-        if self.request(&rid)?.kind == RequestKind::Template {
+        let request = self.request(&rid)?;
+        if request.kind == RequestKind::Template {
             self.plan_template(&rid).await
         } else {
-            self.plan(&rid, None).await
+            self.plan(&rid, request.asked).await
         }
     }
 
-    /// Asks Claude which kind of work a request in words is, and gives the request that kind and
-    /// what it needs: a template and its languages, or nothing more for a design.
+    /// Asks the design agent which kind of work a request in words is, and gives the request that
+    /// kind and what it needs: a template and its languages, or nothing more for a design.
     async fn route(&self, rid: &str) -> Result<(), String> {
         let listing = self.template_listing().await?;
         let request = self.request(rid)?;
@@ -486,24 +741,15 @@ impl Studio {
         fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
         let system = folder.join("system-route.md");
         fs::write(&system, template_prompts::ROUTE_SYSTEM).map_err(|e| e.to_string())?;
-        let mut call = ClaudeCall::new(
-            template_prompts::route_prompt(&request.prompt, &listing),
-            folder,
-            system,
-        );
-        call.session_id = Some(uuid::Uuid::new_v4().to_string());
-        call.model = Some(request.model.clone()).filter(|m| !m.is_empty());
-        call.effort = Some(request.effort.clone()).filter(|e| !e.is_empty());
-        call.json_schema = Some(template_prompts::route_schema());
-        call.timeout = Duration::from_secs(10 * 60);
-        let result = {
-            let _slot = self
-                .claude_slots
-                .acquire()
-                .await
-                .map_err(|e| e.to_string())?;
-            claude::run(call, |_, _| {}).await?
-        };
+        let result = self
+            .answer(
+                &request,
+                template_prompts::route_prompt(&request.prompt, &listing),
+                system,
+                template_prompts::route_schema(),
+                10,
+            )
+            .await?;
         let answer = result.structured.as_object().cloned().unwrap_or_default();
         let kind = answer
             .get("kind")
@@ -566,7 +812,7 @@ impl Studio {
             Some("design") => {
                 self.store.update_request(rid, |request| {
                     request.kind = RequestKind::Design;
-                    request.languages = Some(languages::chosen(&[request.languages.as_ref()]));
+                    request.languages = Some(prompts::all_languages());
                 });
                 Ok(())
             }
@@ -578,7 +824,8 @@ impl Studio {
         }
     }
 
-    /// A variant for each language of a template request that has none yet.
+    /// A variant for each language of a template request that has none yet: the languages asked
+    /// for, else every language its sample lacks.
     async fn plan_template(self: &Arc<Self>, rid: &str) -> Result<(), String> {
         let listing = self.template_listing().await?;
         let request = self.request(rid)?;
@@ -591,9 +838,15 @@ impl Studio {
                     quoted(request.template_id.clone().map(Value::String).as_ref())
                 )
             })?;
-        let langs = languages::known(request.languages.as_deref().unwrap_or_default())?;
+        let mut langs = languages::known(request.languages.as_deref().unwrap_or_default())?;
         if langs.is_empty() {
-            return Err("Name at least one language to write the sample in.".into());
+            langs.clone_from(&entry.missing);
+            let kept = langs.clone();
+            self.store
+                .update_request(rid, |request| request.languages = Some(kept));
+        }
+        if langs.is_empty() {
+            return Err("The template's sample is written in every language already.".into());
         }
         let has: HashSet<String> = request
             .variant_ids
@@ -603,6 +856,17 @@ impl Studio {
             .filter_map(|variant| variant.lang)
             .collect();
         let instructions = request.instructions.clone().unwrap_or_default();
+        let shown = if langs.len() <= 3 {
+            langs.join(", ")
+        } else {
+            format!("{} languages", langs.len())
+        };
+        let title = format!("{} · {shown}", entry.name.en);
+        self.store.update_request(rid, |request| {
+            if request.kind == RequestKind::Template && request.route.is_none() {
+                request.title.clone_from(&title);
+            }
+        });
         for lang in langs {
             if has.contains(&lang) {
                 continue;
@@ -613,6 +877,7 @@ impl Studio {
                 template_id: Some(entry.id.clone()),
                 lang: Some(lang.clone()),
                 languages: Some(vec![lang.clone()]),
+                phase: None,
             };
             let variant = self
                 .store
@@ -625,15 +890,16 @@ impl Studio {
         Ok(())
     }
 
-    /// Plans `count` more concepts, or at first as many as the request asks for.
+    /// Plans `count` more concepts, or at first as many as the request asks for: each an English
+    /// master, to be written in every other language once it is approved.
     async fn plan(self: &Arc<Self>, rid: &str, count: Option<u32>) -> Result<(), String> {
         let known = self.library.known(false).await;
         let mut taken: HashSet<String> = known.ids.iter().cloned().collect();
         taken.extend(self.store.all_design_ids());
         let request = self.request(rid)?;
         let plan_dir = self.store.request_dir(rid).join("plan");
-        let langs = languages::chosen(&[request.languages.as_ref()]);
-        let (system_plan, _) = self.system_files(&plan_dir, &langs).await?;
+        let master = vec!["en".to_owned()];
+        let (system_plan, _) = self.system_files(&plan_dir, &master).await?;
         let made: Vec<String> = request
             .variant_ids
             .iter()
@@ -656,7 +922,7 @@ impl Studio {
             &known.groups,
             &sorted,
             group,
-            &langs,
+            &master,
         );
         if !made.is_empty() {
             prompt.push_str(
@@ -671,20 +937,15 @@ impl Studio {
                     .join("\n"),
             );
         }
-        let mut call = ClaudeCall::new(prompt, plan_dir, system_plan);
-        call.session_id = Some(uuid::Uuid::new_v4().to_string());
-        call.model = Some(request.model.clone()).filter(|m| !m.is_empty());
-        call.effort = Some(request.effort.clone()).filter(|e| !e.is_empty());
-        call.json_schema = Some(prompts::plan_schema(&langs));
-        call.timeout = Duration::from_secs(20 * 60);
-        let result = {
-            let _slot = self
-                .claude_slots
-                .acquire()
-                .await
-                .map_err(|e| e.to_string())?;
-            claude::run(call, |_, _| {}).await?
-        };
+        let result = self
+            .answer(
+                &request,
+                prompt,
+                system_plan,
+                prompts::plan_schema(&master),
+                20,
+            )
+            .await?;
         let concepts: Vec<Value> = items(result.structured.get("concepts"))
             .iter()
             .take(count.unwrap_or(prompts::MOST_CONCEPTS) as usize)
@@ -702,11 +963,17 @@ impl Studio {
             request.count = Some(request.count.unwrap_or(0) + concepts.len() as u32);
             request.status = RequestStatus::Ready;
         });
+        let langs = languages::chosen(&[request.languages.as_ref()]);
         for concept in &concepts {
             let brief = make_brief(concept, &mut taken, group);
+            let fields = NewVariant {
+                languages: Some(langs.clone()),
+                phase: Some(Phase::Master),
+                ..NewVariant::default()
+            };
             let variant = self
                 .store
-                .create_variant(rid, Brief::Design(brief), NewVariant::default())
+                .create_variant(rid, Brief::Design(brief), fields)
                 .ok_or("No such request.")?;
             self.start_variant(&variant.id)?;
         }
@@ -733,8 +1000,11 @@ impl Studio {
     }
 
     async fn make(&self, vid: &str) -> Result<(), String> {
-        if self.variant(vid)?.is_template() {
+        let variant = self.variant(vid)?;
+        if variant.is_template() {
             self.make_template_steps(vid).await
+        } else if matches!(variant.phase, Some(Phase::Translating | Phase::Full)) {
+            self.translate_steps(vid).await
         } else {
             self.make_steps(vid).await
         }
@@ -745,7 +1015,7 @@ impl Studio {
             .map_or(2, |request| request.review_rounds)
     }
 
-    /// The latest render's folder, as Claude names it from its own folder.
+    /// The latest render's folder, as an agent names it from its own folder.
     fn renders(&self, vid: &str) -> String {
         format!(
             "renders/r{}",
@@ -766,7 +1036,7 @@ impl Studio {
     }
 
     /// A template's sample in one language: written, rendered, reviewed, and mended when it breaks
-    /// the sample's contract.
+    /// the sample's contract. The translation agent writes it.
     async fn make_template_steps(&self, vid: &str) -> Result<(), String> {
         let variant = self.variant(vid)?;
         let work = self.store.work_dir(&variant);
@@ -778,12 +1048,15 @@ impl Studio {
             self.templates.prepare_work(&work, brief).await?;
         }
         let langs = [lang.clone()];
+        let file = vec![sample_file(&lang)];
         if variant.session_id.is_none() || !missing_files(&work, &variant, &langs).is_empty() {
-            self.store.update_variant(vid, |v| v.session_id = None);
+            self.store.update_variant(vid, |v| v.set_main_session(None));
             self.turn(
                 vid,
                 VariantStatus::Writing,
                 template_prompts::build_prompt(brief),
+                Role::Translation,
+                file.clone(),
             )
             .await?;
         }
@@ -792,11 +1065,20 @@ impl Studio {
         while let Some(round) = self.next_review(vid, rounds) {
             let prompt =
                 template_prompts::review_prompt(&result, round, rounds, &self.renders(vid), &lang);
-            if !self.turn(vid, VariantStatus::Reviewing, prompt).await? {
+            if !self
+                .turn(
+                    vid,
+                    VariantStatus::Reviewing,
+                    prompt,
+                    Role::Translation,
+                    file.clone(),
+                )
+                .await?
+            {
                 self.store.log(
                     vid,
                     "info",
-                    "Claude reviewed the renders and changed nothing.",
+                    "The agent reviewed the renders and changed nothing.",
                 );
                 break;
             }
@@ -808,16 +1090,27 @@ impl Studio {
             self.store.log(
                 vid,
                 "info",
-                "The sample breaks its contract; Claude fixes it.",
+                "The sample breaks its contract; the agent fixes it.",
             );
             let prompt = template_prompts::fix_prompt(&result, &self.renders(vid), &lang);
-            if self.turn(vid, VariantStatus::Reviewing, prompt).await? {
+            if self
+                .turn(
+                    vid,
+                    VariantStatus::Reviewing,
+                    prompt,
+                    Role::Translation,
+                    file,
+                )
+                .await?
+            {
                 self.render(vid).await?;
             }
         }
         Ok(())
     }
 
+    /// A design's master (or a design from before there were stages, in all its languages): its
+    /// picture, its HTML, its render, its review, and a fix when it breaks the gallery's contract.
     async fn make_steps(&self, vid: &str) -> Result<(), String> {
         let variant = self.variant(vid)?;
         let work = self.store.work_dir(&variant);
@@ -828,9 +1121,10 @@ impl Studio {
         if !work.join("subject.png").exists() {
             self.image(vid, None).await?;
         }
-        let langs = self.languages_of(&variant);
+        let langs = self.design_languages(&variant);
+        let files: Vec<String> = langs.iter().map(|lang| languages::file_of(lang)).collect();
         if variant.session_id.is_none() || !missing_files(&work, &variant, &langs).is_empty() {
-            self.store.update_variant(vid, |v| v.session_id = None);
+            self.store.update_variant(vid, |v| v.set_main_session(None));
             let variant = self.variant(vid)?;
             let brief = variant.brief.design().cloned().unwrap_or_default();
             let size = picture_size(&work.join("subject.png"))?;
@@ -838,6 +1132,8 @@ impl Studio {
                 vid,
                 VariantStatus::Writing,
                 prompts::build_prompt(&brief, size, &langs),
+                Role::Design,
+                files.clone(),
             )
             .await?;
             self.apply_brief(vid).await?;
@@ -846,11 +1142,20 @@ impl Studio {
         let rounds = self.review_rounds(&variant);
         while let Some(round) = self.next_review(vid, rounds) {
             let prompt = prompts::review_prompt(&result, round, rounds, &self.renders(vid), &langs);
-            if !self.turn(vid, VariantStatus::Reviewing, prompt).await? {
+            if !self
+                .turn(
+                    vid,
+                    VariantStatus::Reviewing,
+                    prompt,
+                    Role::Design,
+                    files.clone(),
+                )
+                .await?
+            {
                 self.store.log(
                     vid,
                     "info",
-                    "Claude reviewed the renders and changed nothing.",
+                    "The agent reviewed the renders and changed nothing.",
                 );
                 break;
             }
@@ -863,10 +1168,13 @@ impl Studio {
             self.store.log(
                 vid,
                 "info",
-                "The design breaks the gallery's contract; Claude fixes it.",
+                "The design breaks the gallery's contract; the agent fixes it.",
             );
             let prompt = prompts::fix_prompt(&result, &self.renders(vid), &langs);
-            if self.turn(vid, VariantStatus::Reviewing, prompt).await? {
+            if self
+                .turn(vid, VariantStatus::Reviewing, prompt, Role::Design, files)
+                .await?
+            {
                 self.apply_brief(vid).await?;
                 self.render(vid).await?;
             }
@@ -874,78 +1182,219 @@ impl Studio {
         Ok(())
     }
 
-    /// One turn of the variant's Claude session. True when it changed a file.
-    async fn turn(&self, vid: &str, stage: VariantStatus, prompt: String) -> Result<bool, String> {
+    /// The other languages of an approved master: written a few at a time by the translation
+    /// agent, with their names and tags; then every language rendered, reviewed, and fixed when it
+    /// breaks the contract. A language already written is not written again.
+    async fn translate_steps(&self, vid: &str) -> Result<(), String> {
         let variant = self.variant(vid)?;
         let work = self.store.work_dir(&variant);
         let langs = self.languages_of(&variant);
-        let system = if variant.is_template() {
-            self.template_system_file(&variant).await?
-        } else {
-            self.system_files(&self.store.variant_dir(&variant), &langs)
-                .await?
-                .1
-        };
-        let before = fingerprint(&work, &variant, &langs);
-        self.set(vid, stage, Some("waiting for Claude"));
-        let result = {
-            let _slot = self
-                .claude_slots
-                .acquire()
-                .await
-                .map_err(|e| e.to_string())?;
-            self.set(vid, stage, None);
-            let (first, session) = self
-                .store
-                .update_variant(vid, |v| {
-                    let first = v.session_id.is_none();
-                    if first {
-                        v.session_id = Some(uuid::Uuid::new_v4().to_string());
-                    }
-                    (first, v.session_id.clone())
-                })
-                .ok_or("No such variant.")?;
-            let options = self.options(&variant);
-            let mut call = ClaudeCall::new(prompt, work.clone(), system);
-            call.tools = TOOLS.to_vec();
-            if first {
-                call.session_id = session;
-            } else {
-                call.resume = session;
+        let others = others_of(&langs);
+        let others_files: Vec<String> = others.iter().map(|l| languages::file_of(l)).collect();
+        let localized = read_json::<Value>(&work.join(LOCALIZED)).unwrap_or(Value::Null);
+        let missing: Vec<String> = others
+            .iter()
+            .filter(|lang| {
+                !work.join(languages::file_of(lang)).exists()
+                    || localized.pointer(&format!("/names/{lang}")).is_none()
+            })
+            .cloned()
+            .collect();
+        if !missing.is_empty() {
+            // The master as the app drew it, which every language is written from.
+            let master = format!("{}/en-full.png", self.renders(vid));
+            for batch in missing.chunks(TRANSLATION_BATCH) {
+                let brief = self
+                    .variant(vid)?
+                    .brief
+                    .design()
+                    .cloned()
+                    .unwrap_or_default();
+                let files: Vec<String> = batch.iter().map(|l| languages::file_of(l)).collect();
+                self.store.log(
+                    vid,
+                    "info",
+                    format!("Writing {}.", languages::names(batch, "and")),
+                );
+                self.turn(
+                    vid,
+                    VariantStatus::Translating,
+                    prompts::translation_prompt(&brief, batch, &master),
+                    Role::Translation,
+                    files,
+                )
+                .await?;
+                self.apply_localized(vid)?;
             }
-            call.model = options
-                .as_ref()
-                .map(|o| o.model.clone())
-                .filter(|m| !m.is_empty());
-            call.effort = options
-                .as_ref()
-                .map(|o| o.effort.clone())
-                .filter(|e| !e.is_empty());
+        }
+        self.store.update_variant(vid, |v| {
+            if v.phase != Some(Phase::Full) {
+                v.phase = Some(Phase::Full);
+                v.reviews = 0;
+            }
+        });
+        let mut result = self.render(vid).await?;
+        let rounds = self.review_rounds(&variant);
+        while let Some(round) = self.next_review(vid, rounds) {
+            let prompt = prompts::translation_review_prompt(
+                &result,
+                round,
+                rounds,
+                &self.renders(vid),
+                &langs,
+            );
+            if !self
+                .turn(
+                    vid,
+                    VariantStatus::Reviewing,
+                    prompt,
+                    Role::Translation,
+                    others_files.clone(),
+                )
+                .await?
+            {
+                self.store.log(
+                    vid,
+                    "info",
+                    "The agent reviewed the languages and changed nothing.",
+                );
+                break;
+            }
+            self.apply_localized(vid)?;
+            result = self.render(vid).await?;
+        }
+        if !publishable(&result) {
+            self.store.log(
+                vid,
+                "info",
+                "A language breaks the gallery's contract; the translation agent fixes it.",
+            );
+            let prompt = prompts::translation_fix_prompt(&result, &self.renders(vid), &langs);
+            if self
+                .turn(
+                    vid,
+                    VariantStatus::Reviewing,
+                    prompt,
+                    Role::Translation,
+                    others_files,
+                )
+                .await?
+            {
+                self.apply_localized(vid)?;
+                self.render(vid).await?;
+            }
+        }
+        Ok(())
+    }
+
+    /// One turn of the agent of `role` on a variant, in its folder, continuing its conversation.
+    /// `outputs` are the files it must have written when it ends. True when it changed a file.
+    async fn turn(
+        &self,
+        vid: &str,
+        stage: VariantStatus,
+        prompt: String,
+        role: Role,
+        outputs: Vec<String>,
+    ) -> Result<bool, String> {
+        let variant = self.variant(vid)?;
+        let work = self.store.work_dir(&variant);
+        let choice = self.agents_of(&variant).of(role).clone();
+        let template = variant.is_template();
+        let translating = role == Role::Translation && !template;
+        let (system, session) = if template {
+            (
+                self.template_system_file(&variant).await?,
+                variant.main_session(),
+            )
+        } else if translating {
+            (
+                self.translation_system_file(&variant).await?,
+                variant.translation_session.clone(),
+            )
+        } else {
+            let langs = self.design_languages(&variant);
+            (
+                self.system_files(&self.store.variant_dir(&variant), &langs)
+                    .await?
+                    .1,
+                variant.main_session(),
+            )
+        };
+        let mut watched = outputs.clone();
+        if translating {
+            for lang in others_of(&self.languages_of(&variant)) {
+                let file = languages::file_of(&lang);
+                if !watched.contains(&file) {
+                    watched.push(file);
+                }
+            }
+            watched.push(LOCALIZED.into());
+        } else if !template {
+            watched.push("brief.json".into());
+        }
+        // A conversation of another program (the role moved), or none while the files exist: the
+        // agent is told where it stands.
+        let fresh = session
+            .as_ref()
+            .is_none_or(|session| session.program != choice.program);
+        let mut prompt = prompt;
+        if fresh && outputs.iter().any(|file| work.join(file).exists()) {
+            prompt = format!(
+                "This folder holds work in progress on this design: read `brief.json` and the files \
+                 named below before you change anything.\n\n{prompt}"
+            );
+        }
+        let before = fingerprint(&work, &watched);
+        let program = choice.program;
+        self.set(
+            vid,
+            stage,
+            Some(match program {
+                Program::Claude => "waiting for Claude",
+                Program::Codex => "waiting for Codex",
+            }),
+        );
+        let result = {
+            let _slot = self.slot(program).await?;
+            self.set(vid, stage, None);
+            let mut turn = Turn::new(choice, prompt, work.clone(), system);
+            turn.writes = true;
+            turn.session = session;
+            turn.timeout = Duration::from_secs(if translating { 45 * 60 } else { 30 * 60 });
             let store = Arc::clone(&self.store);
             let id = vid.to_owned();
-            claude::run(call, move |kind, text| store.log(&id, kind, text)).await?
+            agents::run(turn, move |kind, text| store.log(&id, kind, text)).await?
         };
         self.store.update_variant(vid, |v| {
             v.cost = round4(v.cost + result.cost);
-            if let Some(session) = &result.session_id {
-                v.session_id = Some(session.clone());
+            if let Some(session) = &result.session {
+                if translating {
+                    v.translation_session = Some(session.clone());
+                } else {
+                    v.set_main_session(Some(session.clone()));
+                }
             }
             if !result.text.is_empty() {
                 v.push_log("claude", result.text.chars().take(1500).collect::<String>());
             }
         });
-        let after = fingerprint(&work, &variant, &langs);
-        let missing = missing_files(&work, &variant, &langs);
+        let after = fingerprint(&work, &watched);
+        let missing: Vec<&String> = outputs
+            .iter()
+            .filter(|file| !work.join(file).exists())
+            .collect();
         if !missing.is_empty() {
             return Err(format!(
-                "Claude did not write {}.",
+                "{} did not write {}.",
+                program.name(),
                 languages::listing(&missing, "and")
             ));
         }
         Ok(before != after)
     }
 
-    /// Takes what Claude changed in brief.json: names, group and tags, or a new picture.
+    /// Takes what the design agent changed in brief.json: names, group and tags, or a new picture.
     async fn apply_brief(&self, vid: &str) -> Result<(), String> {
         let variant = self.variant(vid)?;
         let work = self.store.work_dir(&variant);
@@ -979,9 +1428,8 @@ impl Studio {
         {
             brief.group = slugify(group);
         }
-        if let Some(tags) = design_tags(written.get("tags")) {
-            brief.tags = tags;
-        }
+        // The languages it gives tags in replace theirs; the others keep theirs.
+        brief.tags.0.extend(clean_tags(written.get("tags")).0);
         let edit = written
             .get("imageEdit")
             .and_then(Value::as_str)
@@ -1021,6 +1469,41 @@ impl Studio {
         Ok(())
     }
 
+    /// Takes the names and search tags the translation agent wrote in `localized.json`: every
+    /// language but English, whose come from the master; the Hebrew name is the gallery's too.
+    fn apply_localized(&self, vid: &str) -> Result<(), String> {
+        let variant = self.variant(vid)?;
+        let Some(localized) = read_json::<Value>(&self.store.work_dir(&variant).join(LOCALIZED))
+            .filter(Value::is_object)
+        else {
+            return Ok(());
+        };
+        let Some(mut brief) = variant.brief.design().cloned() else {
+            return Ok(());
+        };
+        if let Some(names) = localized.get("names").and_then(Value::as_object) {
+            for (lang, name) in names {
+                let Some(name) = name.as_str().map(str::trim).filter(|n| !n.is_empty()) else {
+                    continue;
+                };
+                if lang == "en" || !languages::is_content(lang) {
+                    continue;
+                }
+                let name: String = name.chars().take(80).collect();
+                if lang == "he" {
+                    brief.name.he.clone_from(&name);
+                }
+                brief.names.insert(lang.clone(), name);
+            }
+        }
+        let mut tags = clean_tags(localized.get("tags"));
+        tags.0.remove("en");
+        brief.tags.0.extend(tags.0);
+        self.store
+            .update_variant(vid, |v| v.brief = Brief::Design(brief));
+        Ok(())
+    }
+
     async fn image(&self, vid: &str, edit: Option<String>) -> Result<(), String> {
         let variant = self.variant(vid)?;
         let work = self.store.work_dir(&variant);
@@ -1029,6 +1512,7 @@ impl Studio {
             .design()
             .map(|d| d.image.clone())
             .unwrap_or_default();
+        let model = Some(self.agents_of(&variant).images.model).filter(|m| !m.is_empty());
         self.set(vid, VariantStatus::Image, Some("waiting for Codex"));
         let fresh = work.join("subject.next.png");
         {
@@ -1055,6 +1539,7 @@ impl Studio {
                     &fresh,
                     &image.aspect,
                     edit.as_ref().map(|_| reference.as_path()),
+                    model.as_deref(),
                 )
                 .await;
                 match made {
@@ -1191,7 +1676,14 @@ impl Studio {
         if variant.status.running() {
             return Err("Wait for it to finish, or stop it.".into());
         }
-        if variant.session_id.is_none() {
+        if variant.discarded {
+            return Err("It was discarded; restore it first.".into());
+        }
+        let work = self.store.work_dir(&variant);
+        let written = outputs(&variant, &self.design_languages(&variant))
+            .iter()
+            .all(|file| work.join(file).exists());
+        if !written {
             return Err("This variant has no design to change yet; retry it first.".into());
         }
         self.store.log(vid, "feedback", feedback.clone());
@@ -1207,34 +1699,104 @@ impl Studio {
     async fn refine_steps(&self, vid: &str, feedback: &str) -> Result<(), String> {
         let variant = self.variant(vid)?;
         if let (VariantKind::Template, Some(lang)) = (&variant.kind, &variant.lang) {
+            let file = vec![sample_file(lang)];
             self.turn(
                 vid,
                 VariantStatus::Writing,
                 template_prompts::feedback_prompt(feedback, lang),
+                Role::Translation,
+                file.clone(),
             )
             .await?;
             let result = self.render(vid).await?;
             if has_errors(&result) {
                 let prompt = template_prompts::fix_prompt(&result, &self.renders(vid), lang);
-                if self.turn(vid, VariantStatus::Reviewing, prompt).await? {
+                if self
+                    .turn(
+                        vid,
+                        VariantStatus::Reviewing,
+                        prompt,
+                        Role::Translation,
+                        file,
+                    )
+                    .await?
+                {
                     self.render(vid).await?;
                 }
             }
             return Ok(());
         }
-        let langs = self.languages_of(&variant);
+        if matches!(variant.phase, Some(Phase::Full | Phase::Translating)) {
+            return self.refine_whole(vid, feedback).await;
+        }
+        let langs = self.design_languages(&variant);
+        let files: Vec<String> = langs.iter().map(|lang| languages::file_of(lang)).collect();
         self.turn(
             vid,
             VariantStatus::Writing,
             prompts::feedback_prompt(feedback, &langs),
+            Role::Design,
+            files.clone(),
         )
         .await?;
         self.apply_brief(vid).await?;
         let result = self.render(vid).await?;
         if has_errors(&result) {
             let prompt = prompts::fix_prompt(&result, &self.renders(vid), &langs);
-            if self.turn(vid, VariantStatus::Reviewing, prompt).await? {
+            if self
+                .turn(vid, VariantStatus::Reviewing, prompt, Role::Design, files)
+                .await?
+            {
                 self.apply_brief(vid).await?;
+                self.render(vid).await?;
+            }
+        }
+        Ok(())
+    }
+
+    /// A change of a design written in every language: the design agent changes the master when
+    /// the change is the design's, then the translation agent brings the other languages in line
+    /// (or makes the change in the languages it concerns), and every language is rendered.
+    async fn refine_whole(&self, vid: &str, feedback: &str) -> Result<(), String> {
+        let variant = self.variant(vid)?;
+        let langs = self.languages_of(&variant);
+        let others: Vec<String> = others_of(&langs)
+            .iter()
+            .map(|lang| languages::file_of(lang))
+            .collect();
+        let master_changed = self
+            .turn(
+                vid,
+                VariantStatus::Writing,
+                prompts::master_change_prompt(feedback),
+                Role::Design,
+                vec!["en.html".into()],
+            )
+            .await?;
+        self.apply_brief(vid).await?;
+        self.turn(
+            vid,
+            VariantStatus::Translating,
+            prompts::translation_change_prompt(feedback, master_changed, &langs),
+            Role::Translation,
+            others.clone(),
+        )
+        .await?;
+        self.apply_localized(vid)?;
+        let result = self.render(vid).await?;
+        if has_errors(&result) {
+            let prompt = prompts::translation_fix_prompt(&result, &self.renders(vid), &langs);
+            if self
+                .turn(
+                    vid,
+                    VariantStatus::Reviewing,
+                    prompt,
+                    Role::Translation,
+                    others,
+                )
+                .await?
+            {
+                self.apply_localized(vid)?;
                 self.render(vid).await?;
             }
         }
@@ -1265,33 +1827,174 @@ impl Studio {
         )
     }
 
-    pub fn approve(&self, vid: &str, approved: bool) -> Result<(), String> {
+    /// The person's approval. Of an English master: the translation agent writes the other
+    /// languages. Of a whole design or a template's sample: it is published to the library at
+    /// once. `false` withdraws an approval.
+    pub fn approve(self: &Arc<Self>, vid: &str, approved: bool) -> Result<Approval, String> {
         let variant = self.variant(vid)?;
-        if approved {
-            if variant.status != VariantStatus::Ready {
-                return Err("Only a finished design can be approved.".into());
-            }
-            if !variant
-                .render
-                .as_ref()
-                .is_some_and(|render| render.publishable)
-            {
-                return Err(
-                    "Its last render did not pass the gallery's contract; ask for a fix first."
-                        .into(),
+        if !approved {
+            self.store.update_variant(vid, |v| {
+                v.approved = false;
+                v.push_log("approval", "Approval withdrawn.");
+            });
+            return Ok(Approval::Withdrawn);
+        }
+        if variant.status != VariantStatus::Ready {
+            return Err("Only a finished design can be approved.".into());
+        }
+        if variant.discarded {
+            return Err("It was discarded; restore it first.".into());
+        }
+        if !variant
+            .render
+            .as_ref()
+            .is_some_and(|render| render.publishable)
+        {
+            return Err(
+                "Its last render did not pass the gallery's contract; ask for a fix first.".into(),
+            );
+        }
+        if variant.is_master() {
+            self.store.update_variant(vid, |v| {
+                v.phase = Some(Phase::Translating);
+                v.status = VariantStatus::Queued;
+                v.push_log(
+                    "approval",
+                    "The English design was approved: its other languages are being written.",
                 );
-            }
+            });
+            self.start_variant(vid)?;
+            return Ok(Approval::Translate);
+        }
+        // A design from before the stages, in fewer languages than every one: the library takes a
+        // design only in all of them, so its English is the master of the languages it lacks.
+        if !variant.is_template()
+            && variant.phase.is_none()
+            && self.languages_of(&variant).len() < languages::CONTENT_LANGUAGES.len()
+        {
+            self.keep_words_of_written_languages(&variant)?;
+            self.store.update_variant(vid, |v| {
+                v.languages = Some(prompts::all_languages());
+                v.phase = Some(Phase::Translating);
+                v.status = VariantStatus::Queued;
+                v.push_log(
+                    "approval",
+                    "Approved: the languages it lacks are being written from its English.",
+                );
+            });
+            self.start_variant(vid)?;
+            return Ok(Approval::Translate);
+        }
+        if variant.is_published() {
+            return Err("It is published as it is.".into());
         }
         self.store.update_variant(vid, |v| {
-            v.approved = approved;
-            v.push_log(
-                "approval",
-                if approved {
-                    "Approved for publishing."
-                } else {
-                    "Approval withdrawn."
-                },
-            );
+            v.approved = true;
+            v.publish_error = None;
+            v.status = VariantStatus::Publishing;
+            v.push_log("approval", "Approved: it is being published.");
+        });
+        let studio = Arc::clone(self);
+        let id = vid.to_owned();
+        self.spawn_variant(
+            vid,
+            Box::pin(async move { studio.publish_steps(&id).await }),
+        )
+        .map(|()| Approval::Publish)
+    }
+
+    /// Writes into `localized.json` the names and tags of the languages a design from before the
+    /// stages was written in, so that the translation agent writes only the languages it lacks.
+    fn keep_words_of_written_languages(&self, variant: &Variant) -> Result<(), String> {
+        let Some(brief) = variant.brief.design() else {
+            return Ok(());
+        };
+        let path = self.store.work_dir(variant).join(LOCALIZED);
+        let mut localized = read_json::<Value>(&path)
+            .filter(Value::is_object)
+            .unwrap_or_else(|| json!({"names": {}, "tags": {}}));
+        for lang in others_of(&self.languages_of(variant)) {
+            let name = brief
+                .names
+                .get(&lang)
+                .cloned()
+                .or_else(|| match lang.as_str() {
+                    "he" => Some(brief.name.he.clone()),
+                    _ => None,
+                });
+            if let Some(name) = name.filter(|name| !name.is_empty()) {
+                localized["names"][&lang] = json!(name);
+            }
+            if brief.tags.has(&lang) {
+                localized["tags"][&lang] = json!(brief.tags.get(&lang));
+            }
+        }
+        write_json(&path, &localized).map_err(|e| e.to_string())
+    }
+
+    /// Approves each of `vids`, as `approve` does; what became of each.
+    pub fn approve_many(self: &Arc<Self>, vids: &[String]) -> Vec<Value> {
+        vids.iter()
+            .map(|vid| match self.approve(vid, true) {
+                Ok(Approval::Translate) => json!({"variantId": vid, "action": "translate"}),
+                Ok(Approval::Publish) => json!({"variantId": vid, "action": "publish"}),
+                Ok(Approval::Withdrawn) => json!({"variantId": vid, "action": "skip"}),
+                Err(error) => json!({"variantId": vid, "action": "skip", "error": error}),
+            })
+            .collect()
+    }
+
+    /// Sends an approved variant to the library, one publication at a time. A failure is kept on
+    /// the variant (`publishError`), which stays as it was made.
+    async fn publish_steps(&self, vid: &str) -> Result<(), String> {
+        let _slot = self
+            .publish_slots
+            .acquire()
+            .await
+            .map_err(|e| e.to_string())?;
+        self.set(vid, VariantStatus::Publishing, None);
+        let item = self
+            .library
+            .upload(&[vid.to_owned()])
+            .await
+            .into_iter()
+            .next()
+            .unwrap_or(Value::Null);
+        let status = item.get("status").and_then(Value::as_str).unwrap_or("");
+        let failure = if let Some(error) = item.get("error").and_then(Value::as_str) {
+            let issues: Vec<String> = items(item.get("issues"))
+                .iter()
+                .filter_map(|issue| {
+                    let message = issue.get("message").and_then(Value::as_str)?;
+                    let path = issue.get("path").and_then(Value::as_str).unwrap_or("");
+                    Some(format!("{path}: {message}"))
+                })
+                .collect();
+            Some(if issues.is_empty() {
+                error.to_owned()
+            } else {
+                format!("{error} {}", issues.join("; "))
+            })
+        } else if status != "published" {
+            let note = item.get("note").and_then(Value::as_str).unwrap_or("");
+            Some(
+                format!("It waits in the library ({status}). {note}")
+                    .trim()
+                    .to_owned(),
+            )
+        } else {
+            item.get("tagsError")
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        };
+        self.store.update_variant(vid, |v| {
+            if status != "published" {
+                v.approved = false;
+            }
+            if let Some(failure) = &failure {
+                v.push_log("error", failure.clone());
+            }
+            v.publish_error = failure;
         });
         Ok(())
     }
@@ -1308,15 +2011,16 @@ impl Studio {
         Ok(())
     }
 
-    /// What the render page converts: the HTML of every language of a design and its picture, or
-    /// a template and its sample in the variant's language, with the English one it is held to.
+    /// What the render page converts: the HTML of every language of a design being made and its
+    /// picture, or a template and its sample in the variant's language, with the English one it is
+    /// held to.
     pub fn render_input(&self, vid: &str) -> Result<Value, String> {
         let variant = self.variant(vid)?;
         let work = self.store.work_dir(&variant);
         if variant.is_template() {
             return template_render_input(&variant, &work);
         }
-        let langs = self.languages_of(&variant);
+        let langs = self.making(&variant);
         let mut missing = missing_files(&work, &variant, &langs);
         if !work.join("subject.png").exists() {
             missing.push("subject.png".into());
@@ -1440,7 +2144,8 @@ fn make_brief(concept: &Value, taken: &mut HashSet<String>, group: Option<&str>)
             .filter(|names| truthy(names))
             .cloned()
             .unwrap_or_else(|| json!({})),
-        tags: design_tags(concept.get("tags")).unwrap_or_default(),
+        tags: clean_tags(concept.get("tags")),
+        names: std::collections::BTreeMap::new(),
         concept: text("concept"),
         art: text("art"),
         copy: concept.get("copy").cloned().unwrap_or_else(|| json!({})),
@@ -1492,9 +2197,11 @@ mod tests {
             Arc::clone(&store),
             Arc::clone(&templates),
         ));
+        let prefs = Arc::new(Preferences::load(agents::settings_file(&settings.data)));
         Arc::new(Studio::new(
             settings,
             store,
+            prefs,
             Arc::new(Instructions::new("http://127.0.0.1:9/".into())),
             library,
             templates,
@@ -1573,10 +2280,6 @@ mod tests {
                 .as_str()
                 .is_some_and(|html| html.contains("日本語"))
         );
-        assert_eq!(
-            watched(&variant, &langs(&["he", "en", "ar", "ja"])),
-            ["he.html", "en.html", "ar.html", "ja.html", "brief.json"]
-        );
     }
 
     #[test]
@@ -1646,6 +2349,7 @@ mod tests {
                     template_id: Some("mifgash".into()),
                     lang: Some("de".into()),
                     languages: Some(langs(&["de"])),
+                    phase: None,
                 },
             )
             .expect("a variant");
@@ -1674,7 +2378,7 @@ mod tests {
                 "template.md"
             ]
         );
-        assert_eq!(watched(&variant, &langs(&["de"])), ["de.json"]);
+        assert_eq!(outputs(&variant, &langs(&["de"])), ["de.json"]);
         assert!(
             studio
                 .render_input(&variant.id)
@@ -1720,6 +2424,179 @@ mod tests {
         assert_eq!(
             make_brief(&concept, &mut taken, Some("Sales")).group,
             "sales"
+        );
+    }
+
+    /// A design request's master in a chat, written in English and nothing else yet.
+    fn master(studio: &Studio) -> Variant {
+        let chat = studio.store.create_chat("an invitation");
+        let mut draft = Request::draft(RequestKind::Design, "an invitation".into());
+        draft.chat_id = Some(chat.id);
+        draft.languages = Some(prompts::all_languages());
+        let request = studio.store.create_request(draft);
+        let fields = NewVariant {
+            languages: Some(prompts::all_languages()),
+            phase: Some(Phase::Master),
+            ..NewVariant::default()
+        };
+        studio
+            .store
+            .create_variant(&request.id, design_brief(), fields)
+            .expect("a variant")
+    }
+
+    #[test]
+    fn a_master_is_written_and_rendered_in_english_alone() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let studio = studio(dir.path(), Templates::new("http://127.0.0.1:9/".into()));
+        let variant = master(&studio);
+        assert_eq!(studio.languages_of(&variant).len(), 16);
+        assert_eq!(studio.making(&variant), ["en"]);
+        let work = studio.store.work_dir(&variant);
+        png(&work.join("subject.png"));
+        fs::write(work.join("en.html"), "<div lang='en'></div>").expect("written");
+        let data = studio.render_input(&variant.id).expect("the input");
+        assert_eq!(data["languages"], json!(["en"]));
+        let order: Vec<&String> = data["html"]
+            .as_object()
+            .map(|h| h.keys().collect())
+            .unwrap_or_default();
+        assert_eq!(order, ["en"]);
+        // Once whole, every language is rendered.
+        let whole = studio
+            .store
+            .update_variant(&variant.id, |v| {
+                v.phase = Some(Phase::Full);
+                v.clone()
+            })
+            .expect("updated");
+        assert_eq!(studio.making(&whole).len(), 16);
+        assert!(
+            studio
+                .render_input(&variant.id)
+                .is_err_and(|e| e.contains("he.html") && e.contains("zh-CN.html"))
+        );
+    }
+
+    #[test]
+    fn a_master_is_approved_only_when_it_is_ready_and_holds() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let studio = studio(dir.path(), Templates::new("http://127.0.0.1:9/".into()));
+        let variant = master(&studio);
+        assert!(
+            studio
+                .approve(&variant.id, true)
+                .is_err_and(|e| e.contains("finished"))
+        );
+        studio.store.update_variant(&variant.id, |v| {
+            v.status = VariantStatus::Ready;
+            v.render = Some(RenderSummary {
+                revision: 1,
+                publishable: false,
+                ..RenderSummary::default()
+            });
+        });
+        assert!(
+            studio
+                .approve(&variant.id, true)
+                .is_err_and(|e| e.contains("contract"))
+        );
+        let items = studio.approve_many(std::slice::from_ref(&variant.id));
+        assert_eq!(items[0]["action"], "skip");
+        assert!(items[0]["error"].is_string());
+        assert!(matches!(
+            studio.approve(&variant.id, false),
+            Ok(Approval::Withdrawn)
+        ));
+    }
+
+    #[tokio::test]
+    async fn a_message_asks_for_what_the_studio_can_make() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let studio = studio(dir.path(), Templates::new("http://127.0.0.1:9/".into()));
+        let refused = studio.send(ChatSend {
+            text: "180 new emoji for the holidays".into(),
+            kind: "emoji".into(),
+            ..ChatSend::default()
+        });
+        assert!(refused.is_err_and(|e| e.contains("cannot take new emoji")));
+        assert!(studio.store.chats().is_empty());
+        let no_template = studio.send(ChatSend {
+            text: "in every language".into(),
+            kind: "template".into(),
+            ..ChatSend::default()
+        });
+        assert!(no_template.is_err_and(|e| e.contains("Choose the template")));
+        assert!(
+            studio
+                .send(ChatSend {
+                    text: "x".into(),
+                    kind: "design".into(),
+                    count: Some(40),
+                    ..ChatSend::default()
+                })
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_message_about_outputs_asks_each_for_the_change() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let studio = studio(dir.path(), Templates::new("http://127.0.0.1:9/".into()));
+        let variant = master(&studio);
+        let cid = studio
+            .store
+            .request(&variant.request_id)
+            .and_then(|r| r.chat_id)
+            .expect("its chat");
+        // Not written yet: the change cannot be made, and the message says so.
+        studio
+            .store
+            .update_variant(&variant.id, |v| v.status = VariantStatus::Failed);
+        let chat = studio
+            .send(ChatSend {
+                chat_id: Some(cid.clone()),
+                text: "a warmer palette".into(),
+                kind: "design".into(),
+                refs: vec![variant.id.clone()],
+                ..ChatSend::default()
+            })
+            .expect("the chat");
+        assert_eq!(chat.id, cid);
+        let message = chat.messages.last().expect("the message");
+        assert_eq!(message.refs, std::slice::from_ref(&variant.id));
+        assert!(message.request_ids.is_empty());
+        assert_eq!(message.errors.len(), 1);
+        assert!(message.errors[0].error.contains("retry it first"));
+        // No request was made for it.
+        assert_eq!(studio.store.requests().len(), 1);
+    }
+
+    #[test]
+    fn a_chat_keeps_its_own_agents_over_the_settings() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let studio = studio(dir.path(), Templates::new("http://127.0.0.1:9/".into()));
+        let chat = studio.store.create_chat("x");
+        let own = OwnAgents {
+            design: Some(agents::AgentChoice {
+                program: Program::Codex,
+                ..agents::AgentChoice::default()
+            }),
+            ..OwnAgents::default()
+        };
+        studio.set_chat_agents(&chat.id, Some(own)).expect("kept");
+        let agents = studio.agents_of_chat(Some(&chat.id));
+        assert_eq!(agents.design.program, Program::Codex);
+        assert_eq!(agents.translation.program, Program::Claude);
+        let bad = OwnAgents {
+            images: Some(agents::AgentChoice::default()),
+            ..OwnAgents::default()
+        };
+        assert!(studio.set_chat_agents(&chat.id, Some(bad)).is_err());
+        studio.set_chat_agents(&chat.id, None).expect("cleared");
+        assert_eq!(
+            studio.agents_of_chat(Some(&chat.id)),
+            studio.prefs.get().agents
         );
     }
 }

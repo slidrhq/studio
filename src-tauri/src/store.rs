@@ -19,11 +19,19 @@
 //! stored before there was a choice has none, and is made in Hebrew and English. A template
 //! request's `languages` are the languages its sample is written in, a variant each.
 //!
-//! State files are outside the folder Claude works in, so nothing it writes can change them. Every
-//! change is written at once and sent to the studio's window (`Emit`).
+//! A design is made in all sixteen languages: its `phase` is `master` while the design agent makes
+//! the English one, `translating` once the person approved it and the translation agent makes the
+//! others, then `full`. A design stored before there were phases has none, and is whole.
+//!
+//! Chats (`<data>/chats/<cid>.json`) hold the person's messages; each message that asked for work
+//! names the requests it started, and a request names its chat. A request stored before there were
+//! chats is given one when the store loads, holding its prompt.
+//!
+//! State files are outside the folder an agent works in, so nothing it writes can change them.
+//! Every change is written at once and sent to the studio's window (`Emit`).
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     fs, io,
     path::{Path, PathBuf},
     sync::{Arc, Mutex, MutexGuard, PoisonError},
@@ -33,7 +41,10 @@ use std::{
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::{Map, Value, json};
 
-use crate::languages;
+use crate::{
+    agents::{Agents, OwnAgents, Program, Session},
+    languages,
+};
 
 /// Entries a variant's log keeps.
 const LOG_LIMIT: usize = 400;
@@ -141,6 +152,10 @@ pub enum VariantStatus {
     Writing,
     Rendering,
     Reviewing,
+    /// The translation agent writes the other languages of an approved master.
+    Translating,
+    /// Sent to the library.
+    Publishing,
     Ready,
     Failed,
     Cancelled,
@@ -150,9 +165,24 @@ impl VariantStatus {
     pub fn running(self) -> bool {
         matches!(
             self,
-            Self::Queued | Self::Image | Self::Writing | Self::Rendering | Self::Reviewing
+            Self::Queued
+                | Self::Image
+                | Self::Writing
+                | Self::Rendering
+                | Self::Reviewing
+                | Self::Translating
+                | Self::Publishing
         )
     }
+}
+
+/// Where a design is: its English master, the other languages being made, or whole.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Phase {
+    Master,
+    Translating,
+    Full,
 }
 
 /* ------------------------------------------------------------------ requests */
@@ -188,6 +218,9 @@ pub struct Request {
     /// The concepts planned for a design request so far.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub count: Option<u32>,
+    /// The designs the person asked for, when they named a number beside the words.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub asked: Option<u32>,
     /// The gallery group a design request files its designs under; none chosen is empty.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub group: Option<String>,
@@ -207,6 +240,12 @@ pub struct Request {
     /// How a request in words was read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub route: Option<Route>,
+    /// The chat it was asked in.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chat_id: Option<String>,
+    /// The agents in force when it was asked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agents: Option<Agents>,
     /// What an older or newer studio wrote that this one does not read, kept as it was.
     #[serde(flatten)]
     pub rest: Map<String, Value>,
@@ -228,6 +267,7 @@ impl Request {
             kind,
             title: String::new(),
             count: None,
+            asked: None,
             group: None,
             model: String::new(),
             effort: String::new(),
@@ -236,6 +276,8 @@ impl Request {
             template_id: None,
             instructions: None,
             route: None,
+            chat_id: None,
+            agents: None,
             rest: Map::new(),
         }
     }
@@ -255,13 +297,24 @@ pub struct Named {
     pub en: String,
 }
 
-/// The search tags of a design, in Hebrew and English (ADR-108 of the app).
+/// The search tags of a design by language (ADR-108 of the app): English from its plan, the
+/// others from its translation.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Tags {
-    #[serde(default)]
-    pub he: Vec<String>,
-    #[serde(default)]
-    pub en: Vec<String>,
+#[serde(transparent)]
+pub struct Tags(pub BTreeMap<String, Vec<String>>);
+
+impl Tags {
+    pub fn get(&self, lang: &str) -> &[String] {
+        self.0.get(lang).map_or(&[], Vec::as_slice)
+    }
+
+    pub fn set(&mut self, lang: &str, tags: Vec<String>) {
+        self.0.insert(lang.to_owned(), tags);
+    }
+
+    pub fn has(&self, lang: &str) -> bool {
+        !self.get(lang).is_empty()
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -285,6 +338,9 @@ pub struct DesignBrief {
     pub group_name: Value,
     #[serde(default)]
     pub tags: Tags,
+    /// Its name in every language it has one in; Hebrew and English are also `name`.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub names: BTreeMap<String, String>,
     #[serde(default)]
     pub concept: String,
     #[serde(default)]
@@ -405,8 +461,18 @@ pub struct Variant {
     pub error: Option<String>,
     #[serde(default)]
     pub log: Vec<LogEntry>,
-    /// The variant's Claude conversation.
+    /// The design agent's conversation (a template's sample: the translation agent's).
     pub session_id: Option<String>,
+    /// The program that conversation is of; none is Claude Code (every variant from before).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_program: Option<Program>,
+    /// The translation agent's conversation, of a design's other languages.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub translation_session: Option<Session>,
+    /// A design's phase; none on a template's sample and on a design from before there were
+    /// phases (whole).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub phase: Option<Phase>,
     #[serde(default)]
     pub revision: u32,
     pub render: Option<RenderSummary>,
@@ -422,6 +488,9 @@ pub struct Variant {
     pub published: Option<Published>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub upload: Option<Upload>,
+    /// Why its last publication failed.
+    #[serde(default)]
+    pub publish_error: Option<String>,
     #[serde(default)]
     pub cost: f64,
     pub created_at: f64,
@@ -433,6 +502,32 @@ pub struct Variant {
 impl Variant {
     pub fn is_template(&self) -> bool {
         self.kind == VariantKind::Template
+    }
+
+    /// The conversation of its main agent (a design's: the design agent; a sample's: the
+    /// translation agent), of the program it is of.
+    pub fn main_session(&self) -> Option<Session> {
+        self.session_id.clone().map(|id| Session {
+            program: self.session_program.unwrap_or_default(),
+            id,
+        })
+    }
+
+    pub fn set_main_session(&mut self, session: Option<Session>) {
+        self.session_program = session.as_ref().map(|s| s.program);
+        self.session_id = session.map(|s| s.id);
+    }
+
+    /// Whether only its English master exists (or is being made).
+    pub fn is_master(&self) -> bool {
+        self.phase == Some(Phase::Master)
+    }
+
+    /// Whether it is published as it is now.
+    pub fn is_published(&self) -> bool {
+        self.published
+            .as_ref()
+            .is_some_and(|published| published.revision == self.revision)
     }
 
     pub fn push_log(&mut self, kind: &str, text: impl Into<String>) {
@@ -456,6 +551,89 @@ pub struct NewVariant {
     pub lang: Option<String>,
     /// Its languages; by default its request's.
     pub languages: Option<Vec<String>>,
+    /// A design's phase at first.
+    pub phase: Option<Phase>,
+}
+
+/* ------------------------------------------------------------------ chats */
+
+/// Who said a message: the person, or the studio.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Role {
+    User,
+    Studio,
+}
+
+/// What could not be done for an output a message was about.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MessageError {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub variant_id: Option<String>,
+    pub error: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Message {
+    pub id: String,
+    pub at: f64,
+    pub role: Role,
+    #[serde(default)]
+    pub text: String,
+    /// The kind chosen on the rail when it was sent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// The outputs it is about: a change asked for in words.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub refs: Vec<String>,
+    /// The requests it started.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub request_ids: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub errors: Vec<MessageError>,
+}
+
+impl Message {
+    pub fn user(text: String, kind: Option<String>) -> Self {
+        Self {
+            id: new_id("m"),
+            at: now(),
+            role: Role::User,
+            text,
+            kind,
+            refs: Vec::new(),
+            request_ids: Vec::new(),
+            errors: Vec::new(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Chat {
+    pub id: String,
+    pub title: String,
+    pub created_at: f64,
+    pub updated_at: f64,
+    /// Its own choice of agents, over the settings.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agents: Option<OwnAgents>,
+    #[serde(default)]
+    pub messages: Vec<Message>,
+    #[serde(flatten)]
+    pub rest: Map<String, Value>,
+}
+
+/// A title from the words of a message: its first 48 characters, on one line.
+pub fn title_of(text: &str) -> String {
+    text.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(48)
+        .collect()
 }
 
 /* ------------------------------------------------------------------ the store */
@@ -464,17 +642,22 @@ pub struct NewVariant {
 struct State {
     requests: HashMap<String, Request>,
     variants: HashMap<String, Variant>,
+    chats: HashMap<String, Chat>,
 }
 
 pub struct Store {
     root: PathBuf,
+    /// Where the chats are kept: beside the requests.
+    chats_root: PathBuf,
     emit: Emit,
     state: Mutex<State>,
 }
 
 impl Store {
+    /// The requests in `root` (`<data>/requests`), the chats beside them (`<data>/chats`).
     pub fn new(root: PathBuf, emit: Emit) -> Self {
         Self {
+            chats_root: root.with_file_name("chats"),
             root,
             emit,
             state: Mutex::new(State::default()),
@@ -501,14 +684,22 @@ impl Store {
 
     /* -------------------------------------------------------------- loading */
 
-    /// Reads what was there. A variant that was running when the studio stopped is told so.
+    /// Reads what was there. A variant that was running when the studio stopped is told so; a
+    /// request from before there were chats is given one.
     pub fn load(&self) {
+        let mut state = self.state();
+        if let Ok(entries) = fs::read_dir(&self.chats_root) {
+            for entry in entries.flatten() {
+                if let Some(chat) = read_json::<Chat>(&entry.path()) {
+                    state.chats.insert(chat.id.clone(), chat);
+                }
+            }
+        }
         let Ok(entries) = fs::read_dir(&self.root) else {
             return;
         };
         let mut folders: Vec<PathBuf> = entries.flatten().map(|entry| entry.path()).collect();
         folders.sort();
-        let mut state = self.state();
         for folder in folders {
             let Some(mut request) = read_json::<Request>(&folder.join("request.json")) else {
                 continue;
@@ -528,6 +719,22 @@ impl Store {
                     variant.status = VariantStatus::Failed;
                 }
                 state.variants.insert(vid.clone(), variant);
+            }
+            if request
+                .chat_id
+                .as_ref()
+                .is_none_or(|cid| !state.chats.contains_key(cid))
+            {
+                let mut chat = chat_of_old_request(&request);
+                request.chat_id = Some(chat.id.clone());
+                self.save_chat(&mut chat, false);
+                if let Err(error) = write_json(&folder.join("request.json"), &request) {
+                    eprintln!(
+                        "slidr-studio: could not write request {}: {error}",
+                        request.id
+                    );
+                }
+                state.chats.insert(chat.id.clone(), chat);
             }
             state.requests.insert(request.id.clone(), request);
         }
@@ -619,6 +826,66 @@ impl Store {
         (self.emit)(json!({ "type": "requestDeleted", "id": rid }));
     }
 
+    /* -------------------------------------------------------------- chats */
+
+    pub fn chat(&self, cid: &str) -> Option<Chat> {
+        self.state().chats.get(cid).cloned()
+    }
+
+    /// Every chat, the oldest first.
+    pub fn chats(&self) -> Vec<Chat> {
+        let mut chats: Vec<Chat> = self.state().chats.values().cloned().collect();
+        chats.sort_by(|a, b| a.created_at.total_cmp(&b.created_at));
+        chats
+    }
+
+    /// A new chat, titled after the words that start it.
+    pub fn create_chat(&self, text: &str) -> Chat {
+        let created = now();
+        let mut chat = Chat {
+            id: new_id("c"),
+            title: title_of(text),
+            created_at: created,
+            updated_at: created,
+            agents: None,
+            messages: Vec::new(),
+            rest: Map::new(),
+        };
+        let mut state = self.state();
+        self.save_chat(&mut chat, true);
+        state.chats.insert(chat.id.clone(), chat.clone());
+        chat
+    }
+
+    /// Changes a chat, writes it and sends it; None when there is no such chat.
+    pub fn update_chat<T>(&self, cid: &str, change: impl FnOnce(&mut Chat) -> T) -> Option<T> {
+        let mut state = self.state();
+        let chat = state.chats.get_mut(cid)?;
+        let out = change(chat);
+        self.save_chat(chat, true);
+        Some(out)
+    }
+
+    /// Forgets a chat; its requests are the caller's to delete.
+    pub fn delete_chat(&self, cid: &str) {
+        if self.state().chats.remove(cid).is_none() {
+            return;
+        }
+        let _ = fs::remove_file(self.chats_root.join(format!("{cid}.json")));
+        (self.emit)(json!({ "type": "chatDeleted", "id": cid }));
+    }
+
+    fn save_chat(&self, chat: &mut Chat, touched: bool) {
+        if touched {
+            chat.updated_at = now();
+        }
+        let path = self.chats_root.join(format!("{}.json", chat.id));
+        if let Err(error) = write_json(&path, chat) {
+            eprintln!("slidr-studio: could not write chat {}: {error}", chat.id);
+        }
+        (self.emit)(json!({ "type": "chat", "chat": chat }));
+    }
+
     /* -------------------------------------------------------------- variants */
 
     /// A variant of a request: a design (the default), or the sample of a template in one
@@ -645,6 +912,9 @@ impl Store {
             error: None,
             log: Vec::new(),
             session_id: None,
+            session_program: None,
+            translation_session: None,
+            phase: fields.phase,
             revision: 0,
             render: None,
             image_revision: 0,
@@ -654,6 +924,7 @@ impl Store {
             discarded: false,
             published: None,
             upload: None,
+            publish_error: None,
             cost: 0.0,
             created_at: created,
             updated_at: created,
@@ -698,13 +969,99 @@ impl Store {
     }
 }
 
+/// The chat of a request from before there were chats: its prompt, as the message that asked for
+/// it, at the time it was asked.
+fn chat_of_old_request(request: &Request) -> Chat {
+    let text = match (&request.kind, &request.instructions) {
+        (RequestKind::Template, Some(instructions)) if !instructions.is_empty() => {
+            instructions.clone()
+        }
+        (RequestKind::Template, _) => request.title.clone(),
+        _ => request.prompt.clone(),
+    };
+    let title = if request.title.is_empty() {
+        title_of(&text)
+    } else {
+        request.title.clone()
+    };
+    let suffix = request.id.strip_prefix('r').unwrap_or(&request.id);
+    let kind = serde_json::to_value(request.kind)
+        .ok()
+        .and_then(|kind| kind.as_str().map(str::to_owned));
+    Chat {
+        id: format!("c{suffix}"),
+        title,
+        created_at: request.created_at,
+        updated_at: request.updated_at,
+        agents: None,
+        messages: vec![Message {
+            at: request.created_at,
+            request_ids: vec![request.id.clone()],
+            ..Message::user(text, kind)
+        }],
+        rest: Map::new(),
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use super::*;
 
     /// A store in a folder of its own, that sends nothing.
     pub fn store(root: &Path) -> Store {
-        Store::new(root.to_path_buf(), Arc::new(|_| {}))
+        Store::new(root.join("requests"), Arc::new(|_| {}))
+    }
+
+    #[test]
+    fn a_request_from_before_chats_is_given_one() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let first = store(dir.path());
+        let mut draft = Request::draft(RequestKind::Design, "Garden party invitations".into());
+        draft.title = "Garden party".into();
+        let request = first.create_request(draft);
+        assert!(first.chats().is_empty());
+
+        let second = store(dir.path());
+        second.load();
+        let read = second.request(&request.id).expect("the request");
+        let cid = read.chat_id.expect("a chat");
+        let chat = second.chat(&cid).expect("the chat");
+        assert_eq!(chat.title, "Garden party");
+        assert_eq!(chat.messages.len(), 1);
+        assert_eq!(chat.messages[0].text, "Garden party invitations");
+        assert_eq!(
+            chat.messages[0].request_ids,
+            std::slice::from_ref(&request.id)
+        );
+        assert_eq!(chat.messages[0].kind.as_deref(), Some("design"));
+
+        // Kept: a third load finds the same chat, and makes no other.
+        let third = store(dir.path());
+        third.load();
+        assert_eq!(third.chats().len(), 1);
+        assert_eq!(
+            third.request(&request.id).and_then(|r| r.chat_id),
+            Some(cid)
+        );
+    }
+
+    #[test]
+    fn chats_are_kept_and_forgotten() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let store = store(dir.path());
+        let chat = store.create_chat("  three   invitations\nfor a wedding ");
+        assert_eq!(chat.title, "three invitations for a wedding");
+        store.update_chat(&chat.id, |chat| {
+            chat.messages
+                .push(Message::user("x".into(), Some("design".into())));
+        });
+        let again = super::Store::new(dir.path().join("requests"), Arc::new(|_| {}));
+        again.load();
+        assert_eq!(again.chat(&chat.id).map(|c| c.messages.len()), Some(1));
+        again.delete_chat(&chat.id);
+        let third = super::Store::new(dir.path().join("requests"), Arc::new(|_| {}));
+        third.load();
+        assert!(third.chat(&chat.id).is_none());
     }
 
     pub fn design_brief() -> Brief {

@@ -1,4 +1,4 @@
-import { languageDir } from '@slidr/model';
+import { CONTENT_LANGUAGES, languageDir } from '@slidr/model';
 import {
   createContext,
   useCallback,
@@ -39,6 +39,15 @@ export function format(text: string, params?: Params): string {
   );
 }
 
+/** The language the studio was last shown in, kept on this machine; Hebrew at first. */
+const KEY = 'slidr.studio.language';
+const stored: DisplayLang = (() => {
+  const kept = localStorage.getItem(KEY);
+  return kept && (CONTENT_LANGUAGES as readonly string[]).includes(kept)
+    ? (kept as DisplayLang)
+    : 'he';
+})();
+
 interface Shown {
   lang: DisplayLang;
   setLang: (lang: DisplayLang) => void;
@@ -57,11 +66,15 @@ const Context = createContext<Shown>({
  * before is kept until the words of the new one are read.
  */
 export function I18n({ children }: { children: ReactNode }) {
-  const [lang, setLang] = useState<DisplayLang>('he');
+  const [lang, setChosen] = useState<DisplayLang>(stored);
   const [loaded, setLoaded] = useState<{ lang: DisplayLang; words: Words }>({
     lang: 'he',
     words: he,
   });
+  const setLang = useCallback((next: DisplayLang) => {
+    localStorage.setItem(KEY, next);
+    setChosen(next);
+  }, []);
   useEffect(() => {
     let live = true;
     loadWords(lang).then(
@@ -81,7 +94,7 @@ export function I18n({ children }: { children: ReactNode }) {
     (key, params) => format(words[key] ?? en[key] ?? he[key], params),
     [words],
   );
-  const value = useMemo(() => ({ lang, setLang, t }), [lang, t]);
+  const value = useMemo(() => ({ lang, setLang, t }), [lang, setLang, t]);
   return <Context.Provider value={value}>{children}</Context.Provider>;
 }
 

@@ -9,11 +9,11 @@
 //! `templates: translate`, in its language. The studio sends a person's token, all the library
 //! takes from a program (`Authorization: Bearer slk_…`): an admin's, of the `publish` scope.
 
-use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use serde_json::{Map, Value, json};
 
-use crate::{languages, net};
+use crate::{languages, net, store::Tags};
 
 const TIMEOUT: Duration = Duration::from_secs(120);
 
@@ -85,6 +85,34 @@ pub fn sample_upload(template_id: &str, lang: &str, sample: Value) -> Value {
         "id": template_id,
         "languages": {lang: {"sample": sample}},
     })
+}
+
+/// The search tags of items of a part (`designs`, `emoji`…) in every language, as the library's
+/// `<part>: tag` takes them: each language that every item has tags in, Hebrew and English among
+/// them (the library asks every language of an upload to tag the same items). None when Hebrew or
+/// English is not among them.
+pub fn tags_upload(part: &str, items: &BTreeMap<String, Tags>) -> Option<Value> {
+    let langs: Vec<&str> = languages::CONTENT_LANGUAGES
+        .into_iter()
+        .filter(|lang| !items.is_empty() && items.values().all(|tags| tags.has(lang)))
+        .collect();
+    if !languages::BASE_LANGUAGES
+        .iter()
+        .all(|lang| langs.contains(lang))
+    {
+        return None;
+    }
+    let languages: Map<String, Value> = langs
+        .iter()
+        .map(|lang| {
+            let tags: Map<String, Value> = items
+                .iter()
+                .map(|(key, tags)| (key.clone(), json!(tags.get(lang))))
+                .collect();
+            ((*lang).to_owned(), json!({ "tags": tags }))
+        })
+        .collect();
+    Some(json!({"type": part, "action": "tag", "id": part, "languages": languages}))
 }
 
 /// The pictures of a published design's slides drawn again, as the library's `designs: draw` takes
@@ -405,6 +433,40 @@ pub mod tests {
             sample,
             json!({"type": "templates", "action": "translate", "id": "mifgash", "languages": {"fr": {"sample": [{"layout": "l"}]}}})
         );
+    }
+
+    #[test]
+    fn tags_go_in_each_language_every_item_has() {
+        let tagged = |langs: &[&str]| {
+            let mut tags = Tags::default();
+            for lang in langs {
+                tags.set(
+                    lang,
+                    vec![format!("{lang}1"), format!("{lang}2"), format!("{lang}3")],
+                );
+            }
+            tags
+        };
+        let items = BTreeMap::from([
+            ("m-a".to_owned(), tagged(&["he", "en", "fr", "ja"])),
+            ("m-b".to_owned(), tagged(&["ja", "en", "he"])),
+        ]);
+        let upload = tags_upload("designs", &items).expect("an upload");
+        assert_eq!(upload["type"], "designs");
+        assert_eq!(upload["action"], "tag");
+        assert_eq!(upload["id"], "designs");
+        let langs: Vec<&String> = upload["languages"]
+            .as_object()
+            .map(|l| l.keys().collect())
+            .unwrap_or_default();
+        assert_eq!(langs, ["he", "en", "ja"]);
+        assert_eq!(
+            upload["languages"]["ja"]["tags"]["m-b"],
+            json!(["ja1", "ja2", "ja3"])
+        );
+        let untagged = BTreeMap::from([("m-c".to_owned(), tagged(&["en", "fr"]))]);
+        assert!(tags_upload("designs", &untagged).is_none());
+        assert!(tags_upload("designs", &BTreeMap::new()).is_none());
     }
 
     #[test]

@@ -256,12 +256,21 @@ async fn each_line(stream: impl AsyncRead + Unpin, mut on_line: impl FnMut(&str)
     }
 }
 
+/// The command line with the model named right after `exec`, when one is chosen.
+fn with_model(mut args: Vec<String>, model: Option<&str>) -> Vec<String> {
+    if let Some(model) = model {
+        args.splice(1..1, ["--model".to_owned(), model.to_owned()]);
+    }
+    args
+}
+
 /// Generates (or, with a reference, regenerates after it) one picture into `out`.
 pub async fn make_image(
     prompt: &str,
     out: &Path,
     aspect: &str,
     reference: Option<&Path>,
+    model: Option<&str>,
 ) -> Result<(), CodexError> {
     let text = match reference {
         Some(_) => edit_prompt(prompt),
@@ -293,7 +302,7 @@ pub async fn make_image(
 
     let mut command = programs::command(&program);
     command
-        .args(build_args(&text, reference))
+        .args(with_model(build_args(&text, reference), model))
         .current_dir(&workdir)
         // The promise is the ChatGPT sign-in: a key that happens to be set must not bill by use.
         .env_remove("CODEX_API_KEY")
@@ -384,6 +393,234 @@ pub async fn make_image(
     Ok(())
 }
 
+/* ------------------------------------------------------------------ Codex as an agent */
+
+/// One turn of Codex as the agent of a role (`agents.rs`): it works in `cwd`, reads its files with
+/// its shell and the pictures in it, and writes its files with its patch tool or its shell. The
+/// sandbox of Windows keeps its writes to its folder (and the temporary folder); its shell is
+/// Windows PowerShell (`agent_path`).
+pub struct AgentCall {
+    pub prompt: String,
+    pub cwd: PathBuf,
+    pub system_prompt_file: PathBuf,
+    pub writes: bool,
+    /// The thread to continue.
+    pub resume: Option<String>,
+    pub model: Option<String>,
+    pub effort: Option<String>,
+    pub timeout: Duration,
+}
+
+pub struct AgentResult {
+    pub thread: Option<String>,
+    pub text: String,
+}
+
+/// `codex exec` for a turn of an agent:
+///
+/// ```text
+/// codex exec --json --skip-git-repo-check --ignore-user-config --ignore-rules
+///       --sandbox (workspace-write | read-only) -C <cwd> -c approval_policy="never"
+///       -c windows.sandbox="unelevated" -c web_search="disabled"
+///       -c model_instructions_file="<system>" [--model m] [-c model_reasoning_effort="e"]
+///       [resume <thread>] -
+/// stdin: the prompt
+/// ```
+pub fn agent_args(call: &AgentCall) -> Vec<String> {
+    let mut args: Vec<String> = [
+        "exec",
+        "--json",
+        "--skip-git-repo-check",
+        "--ignore-user-config",
+        "--ignore-rules",
+        "--sandbox",
+        if call.writes {
+            "workspace-write"
+        } else {
+            "read-only"
+        },
+        "-C",
+    ]
+    .map(str::to_owned)
+    .to_vec();
+    args.push(call.cwd.display().to_string());
+    let quoted = |text: String| serde_json::Value::String(text).to_string();
+    for setting in [
+        "approval_policy=\"never\"".to_owned(),
+        "windows.sandbox=\"unelevated\"".to_owned(),
+        "features.apps=false".to_owned(),
+        "web_search=\"disabled\"".to_owned(),
+        format!(
+            "model_instructions_file={}",
+            quoted(call.system_prompt_file.display().to_string())
+        ),
+    ] {
+        args.extend(["-c".into(), setting]);
+    }
+    if let Some(model) = &call.model {
+        args.extend(["--model".into(), model.clone()]);
+    }
+    if let Some(effort) = &call.effort {
+        args.extend([
+            "-c".into(),
+            format!("model_reasoning_effort={}", quoted(effort.clone())),
+        ]);
+    }
+    if let Some(thread) = &call.resume {
+        args.extend(["resume".into(), thread.clone()]);
+    }
+    args.push("-".into());
+    args
+}
+
+/// The PATH of an agent's turn: `path` without the folders of the Store's apps (`…\WindowsApps`).
+/// Their aliases (`pwsh.exe`) cannot start under the sandbox, and Codex takes the first shell it
+/// finds on the PATH; without them it takes Windows PowerShell, which can.
+fn agent_path(path: &std::ffi::OsStr) -> Option<std::ffi::OsString> {
+    let kept = std::env::split_paths(path).filter(|dir| {
+        !dir.components()
+            .any(|part| part.as_os_str().eq_ignore_ascii_case("WindowsApps"))
+    });
+    std::env::join_paths(kept).ok()
+}
+
+/// What one line of an agent's stream says to the activity log: a file it wrote, a picture it
+/// looked at, a passage of its text.
+fn agent_activity(event: &Value) -> Option<(&'static str, String)> {
+    let item = event.get("item")?;
+    let completed = event.get("type").and_then(Value::as_str) == Some("item.completed");
+    match item.get("type").and_then(Value::as_str)? {
+        "file_change" if completed => {
+            let files: Vec<String> = item
+                .get("changes")
+                .and_then(Value::as_array)?
+                .iter()
+                .filter_map(|change| change.get("path").and_then(Value::as_str))
+                .map(|path| {
+                    Path::new(path)
+                        .file_name()
+                        .map_or_else(|| path.to_owned(), |n| n.to_string_lossy().into_owned())
+                })
+                .collect();
+            Some(("tool", format!("Write {}", files.join(", "))))
+        }
+        "agent_message" if completed => {
+            let text = item.get("text").and_then(Value::as_str)?.trim();
+            (!text.is_empty()).then(|| ("text", text.chars().take(600).collect()))
+        }
+        "mcp_tool_call" | "web_search" | "command_execution" if !completed => {
+            let name = item
+                .get("tool")
+                .or_else(|| item.get("type"))
+                .and_then(Value::as_str)
+                .unwrap_or("tool");
+            Some(("tool", name.to_owned()))
+        }
+        _ => None,
+    }
+}
+
+/// Runs one turn of Codex as an agent. `on_activity` hears what it does as it does it.
+pub async fn run_agent(
+    call: AgentCall,
+    mut on_activity: impl FnMut(&str, &str) + Send,
+) -> Result<AgentResult, String> {
+    let program = programs::find_codex().ok_or(
+        "The Codex CLI was not found. Install it (`npm install -g @openai/codex`), then run \
+         `codex login`.",
+    )?;
+    fs::create_dir_all(&call.cwd).map_err(|e| format!("{}: {e}", call.cwd.display()))?;
+    let mut command = programs::command(&program);
+    command
+        .args(agent_args(&call))
+        .current_dir(&call.cwd)
+        .env_remove("CODEX_API_KEY")
+        .env_remove("OPENAI_API_KEY")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+    if let Some(path) = std::env::var_os("PATH").and_then(|path| agent_path(&path)) {
+        command.env("PATH", path);
+    }
+    let mut child =
+        programs::spawn(&mut command).map_err(|e| format!("The Codex CLI could not start: {e}"))?;
+    let (Some(mut stdin), Some(stdout), Some(stderr)) =
+        (child.stdin.take(), child.stdout.take(), child.stderr.take())
+    else {
+        return Err("The Codex CLI started without its pipes.".into());
+    };
+    let mut transcript = Transcript::default();
+    let mut stderr_tail = VecDeque::with_capacity(STDERR_LINES);
+    let prompt = call.prompt.into_bytes();
+    let turn = async {
+        let feed = async {
+            use tokio::io::AsyncWriteExt;
+            let _ = stdin.write_all(&prompt).await;
+            let _ = stdin.shutdown().await;
+            drop(stdin);
+        };
+        let out = each_line(stdout, |line| {
+            transcript.read(line);
+            if let Ok(event) = serde_json::from_str::<Value>(line)
+                && let Some((kind, text)) = agent_activity(&event)
+            {
+                on_activity(kind, &text);
+            }
+        });
+        let err = each_line(stderr, |line| {
+            let line = line.trim();
+            // Codex warns of every skill of the person's own it cannot read; not ours to tell.
+            if !line.is_empty() && !line.contains("failed to load skill") {
+                if stderr_tail.len() == STDERR_LINES {
+                    stderr_tail.pop_front();
+                }
+                stderr_tail.push_back(line.to_owned());
+            }
+        });
+        tokio::join!(feed, out, err);
+        child.wait().await
+    };
+    let status = tokio::time::timeout(call.timeout, turn)
+        .await
+        .map_err(|_| {
+            format!(
+                "Codex did not finish within {} seconds and was stopped.",
+                call.timeout.as_secs()
+            )
+        })?;
+    if let Some(said) = &transcript.failure {
+        return Err(agent_failure(said));
+    }
+    let code = status.as_ref().ok().and_then(|status| status.code());
+    if !(transcript.completed && code == Some(0)) {
+        let said = transcript
+            .last_error
+            .clone()
+            .unwrap_or_else(|| stderr_tail.iter().cloned().collect::<Vec<_>>().join(" "));
+        let code = code.map_or_else(|| "none".to_owned(), |code| code.to_string());
+        return Err(agent_failure(&format!(
+            "the CLI stopped with exit code {code} before it was done. {said}"
+        )));
+    }
+    Ok(AgentResult {
+        thread: transcript.thread_id,
+        text: transcript.last_message.unwrap_or_default(),
+    })
+}
+
+fn agent_failure(said: &str) -> String {
+    let short: String = said.chars().take(400).collect();
+    match classify(said) {
+        CodexErrorKind::NotLoggedIn => {
+            format!("The Codex CLI is not signed in. Run `codex login`. The CLI said: {short}")
+        }
+        CodexErrorKind::Quota => {
+            format!("The usage limit of the ChatGPT plan was reached. The CLI said: {short}")
+        }
+        _ => format!("Codex could not finish: {short}"),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
@@ -456,5 +693,65 @@ mod tests {
         let said = format!("saved {}", older.display());
         assert_eq!(pick(both(), Some(&said)), Some(older.clone()));
         assert_eq!(pick(Vec::new(), Some("x")), None);
+    }
+
+    #[test]
+    fn codex_as_an_agent_writes_in_its_folder_with_a_shell_and_resumes() {
+        let mut call = AgentCall {
+            prompt: "x".into(),
+            cwd: PathBuf::from("C:/w"),
+            system_prompt_file: PathBuf::from("C:/s/system.md"),
+            writes: true,
+            resume: None,
+            model: Some("gpt-5.5".into()),
+            effort: Some("high".into()),
+            timeout: Duration::from_secs(1),
+        };
+        let args = agent_args(&call);
+        let at = |flag: &str| args.iter().position(|a| a == flag).expect(flag);
+        assert_eq!(args[at("--sandbox") + 1], "workspace-write");
+        assert_eq!(args[at("-C") + 1], "C:/w");
+        assert!(!args.iter().any(|a| a.starts_with("features.shell_tool")));
+        assert!(args.contains(&"model_instructions_file=\"C:/s/system.md\"".to_owned()));
+        assert!(args.contains(&"model_reasoning_effort=\"high\"".to_owned()));
+        assert_eq!(args[at("--model") + 1], "gpt-5.5");
+        assert_eq!(args.last().map(String::as_str), Some("-"));
+        assert!(!args.contains(&"resume".to_owned()));
+        call.writes = false;
+        call.resume = Some("01a1-thread".into());
+        let args = agent_args(&call);
+        assert!(args.contains(&"read-only".to_owned()));
+        let resume = args.iter().position(|a| a == "resume").expect("resume");
+        assert_eq!(args[resume + 1], "01a1-thread");
+        assert_eq!(args[resume + 2], "-");
+    }
+
+    #[test]
+    fn an_agents_path_leaves_out_the_store_apps() {
+        let path = std::ffi::OsString::from(
+            r"C:\Program Files\nodejs;C:\Users\a\AppData\Local\Microsoft\WindowsApps;C:\WINDOWS",
+        );
+        assert_eq!(
+            agent_path(&path),
+            Some(std::ffi::OsString::from(
+                r"C:\Program Files\nodejs;C:\WINDOWS"
+            ))
+        );
+    }
+
+    #[test]
+    fn codex_agent_activity_names_the_files_it_wrote() {
+        let event = json!({"type": "item.completed", "item": {"type": "file_change",
+            "changes": [{"path": "C:\\w\\en.html", "kind": "add"}, {"path": "C:\\w\\he.html"}]}});
+        assert_eq!(
+            agent_activity(&event),
+            Some(("tool", "Write en.html, he.html".to_owned()))
+        );
+        let said =
+            json!({"type": "item.completed", "item": {"type": "agent_message", "text": " Done. "}});
+        assert_eq!(agent_activity(&said), Some(("text", "Done.".to_owned())));
+        let started =
+            json!({"type": "item.started", "item": {"type": "agent_message", "text": "x"}});
+        assert_eq!(agent_activity(&started), None);
     }
 }

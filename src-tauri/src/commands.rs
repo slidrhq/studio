@@ -3,23 +3,20 @@
 
 use std::sync::Arc;
 
-use serde::Deserialize;
 use serde_json::{Value, json};
-use tauri::{State, WebviewWindow, ipc::Response};
+use tauri::{Emitter, State, WebviewWindow, ipc::Response};
 
 use crate::{
-    gallery, languages,
-    pipeline::Studio,
+    agents::{OwnAgents, StudioSettings},
+    gallery,
+    pipeline::{Approval, ChatSend, Studio},
     programs,
     render::{self, Done, Rect, Renders},
     secrets,
-    store::{Request, RequestKind},
+    store::{Chat, Request},
 };
 
 type Answer<T = Value> = Result<T, String>;
-
-const MODELS: [&str; 5] = ["", "fable", "opus", "sonnet", "haiku"];
-const EFFORTS: [&str; 6] = ["", "low", "medium", "high", "xhigh", "max"];
 
 fn ok() -> Answer {
     Ok(json!({"ok": true}))
@@ -51,7 +48,60 @@ pub fn studio_state(studio: State<'_, Arc<Studio>>) -> Value {
     json!({
         "requests": studio.store.requests(),
         "variants": studio.store.variants(),
+        "chats": studio.store.chats(),
     })
+}
+
+/* ------------------------------------------------------------------ settings */
+
+/// The studio's settings: the agents of each role and the review rounds; and the library.
+#[tauri::command]
+pub fn settings_get(studio: State<'_, Arc<Studio>>) -> Value {
+    let remote = studio.settings.remote().clone();
+    json!({
+        "settings": studio.prefs.get(),
+        "library": {"url": remote.library_url, "token": remote.library_token.is_some()},
+    })
+}
+
+#[tauri::command]
+pub fn settings_set(
+    app: tauri::AppHandle,
+    studio: State<'_, Arc<Studio>>,
+    settings: StudioSettings,
+) -> Answer<StudioSettings> {
+    let settings = studio.prefs.set(settings)?;
+    let _ = app.emit_to(
+        "main",
+        "studio",
+        json!({"type": "settings", "settings": settings}),
+    );
+    Ok(settings)
+}
+
+/* ------------------------------------------------------------------ chats */
+
+/// A message of the person in a chat (a new one when none is named): a request, or a change of
+/// the outputs it is about.
+#[tauri::command]
+pub fn chat_send(studio: State<'_, Arc<Studio>>, body: ChatSend) -> Answer<Chat> {
+    studio.send(body)
+}
+
+/// A chat's own choice of agents; none goes back to the settings'.
+#[tauri::command]
+pub fn chat_agents(
+    studio: State<'_, Arc<Studio>>,
+    chat_id: String,
+    agents: Option<OwnAgents>,
+) -> Answer<Chat> {
+    studio.set_chat_agents(&chat_id, agents)
+}
+
+#[tauri::command]
+pub fn chat_delete(studio: State<'_, Arc<Studio>>, chat_id: String) -> Answer {
+    studio.delete_chat(&chat_id);
+    ok()
 }
 
 #[tauri::command]
@@ -69,105 +119,6 @@ pub async fn template_listing(studio: State<'_, Arc<Studio>>, fresh: Option<bool
 }
 
 /* ------------------------------------------------------------------ requests */
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct NewRequest {
-    /// What to make, in words: a design's description, a template request's instructions
-    /// (optional), or any request for the studio to read (`kind` "auto").
-    #[serde(default)]
-    prompt: String,
-    /// `design`, `template` (the sample of `templateId` in `languages`), or `auto`: Claude reads
-    /// the prompt and makes it one of the two.
-    #[serde(default)]
-    kind: RequestKind,
-    #[serde(default)]
-    template_id: String,
-    #[serde(default)]
-    group: String,
-    #[serde(default)]
-    model: String,
-    #[serde(default)]
-    effort: String,
-    #[serde(default = "two")]
-    review_rounds: u32,
-    /// A design's languages: Hebrew and English always (added when left out), and any other
-    /// content language asked for; none asked for means Hebrew and English only. A template's:
-    /// exactly the languages to write its sample in. A code the registry does not know is refused.
-    #[serde(default)]
-    languages: Vec<String>,
-}
-
-fn two() -> u32 {
-    2
-}
-
-impl NewRequest {
-    /// The request as it is asked for, held to what a request may be.
-    fn checked(self) -> Answer<(Request, Self)> {
-        too_long(&self.prompt, 4000, "request")?;
-        too_long(&self.template_id, 40, "template id")?;
-        too_long(&self.group, 40, "group")?;
-        if self.review_rounds > 3 {
-            return Err("Review at most 3 rounds.".into());
-        }
-        if self.languages.len() > 64 {
-            return Err("Too many languages.".into());
-        }
-        if !MODELS.contains(&self.model.as_str()) || !EFFORTS.contains(&self.effort.as_str()) {
-            return Err("Unknown model or effort.".into());
-        }
-        let prompt = self.prompt.trim().to_owned();
-        let mut request = Request::draft(self.kind, prompt.clone());
-        // A design, or a request that may become one, is made in Hebrew and English always.
-        request.languages = Some(if self.kind == RequestKind::Template {
-            languages::known(&self.languages)?
-        } else {
-            languages::parse(&self.languages)?
-        });
-        request.title = prompt
-            .split_whitespace()
-            .collect::<Vec<_>>()
-            .join(" ")
-            .chars()
-            .take(48)
-            .collect();
-        request.model.clone_from(&self.model);
-        request.effort.clone_from(&self.effort);
-        request.review_rounds = self.review_rounds;
-        Ok((request, self))
-    }
-}
-
-#[tauri::command]
-pub async fn request_new(studio: State<'_, Arc<Studio>>, body: NewRequest) -> Answer<Request> {
-    let (mut request, body) = body.checked()?;
-    if body.kind == RequestKind::Template {
-        let listing = studio.template_listing().await?;
-        let entry = listing
-            .iter()
-            .find(|template| template.id == body.template_id)
-            .ok_or_else(|| format!("The library has no template '{}'.", body.template_id))?;
-        let langs = request.languages.clone().unwrap_or_default();
-        if langs.is_empty() {
-            return Err("Name at least one language to write the sample in.".into());
-        }
-        request.template_id = Some(entry.id.clone());
-        request.instructions = Some(request.prompt.clone());
-        let shown = if langs.len() <= 3 {
-            langs.join(", ")
-        } else {
-            format!("{} languages", langs.len())
-        };
-        request.title = format!("{} · {shown}", entry.name.en);
-    } else {
-        if request.prompt.chars().count() < 3 {
-            return Err("Say what to make.".into());
-        }
-        request.group = Some(body.group.clone());
-    }
-    studio.start_request(request)
-}
 
 #[tauri::command]
 pub fn request_more(
@@ -239,10 +190,25 @@ pub fn variant_image(
     ok()
 }
 
+/// Approves a variant: an English master is written in the other languages, a whole design or a
+/// sample is published at once. `value: false` withdraws an approval.
 #[tauri::command]
 pub fn variant_approve(studio: State<'_, Arc<Studio>>, vid: String, value: Option<bool>) -> Answer {
-    studio.approve(&vid, value.unwrap_or(true))?;
-    ok()
+    let action = match studio.approve(&vid, value.unwrap_or(true))? {
+        Approval::Translate => "translate",
+        Approval::Publish => "publish",
+        Approval::Withdrawn => "skip",
+    };
+    Ok(json!({"variantId": vid, "action": action}))
+}
+
+/// Approves each of these variants, as `variant_approve` does; what became of each.
+#[tauri::command]
+pub fn variants_approve(studio: State<'_, Arc<Studio>>, vids: Vec<String>) -> Answer {
+    if vids.len() > 500 {
+        return Err("Approve at most 500 at once.".into());
+    }
+    Ok(json!({"items": studio.approve_many(&vids)}))
 }
 
 #[tauri::command]
@@ -399,49 +365,3 @@ pub fn render_done(
 
 /// The commands a render window may call; it runs HTML that Claude wrote.
 pub const RENDER_COMMANDS: [&str; 3] = ["render_input", "capture_clip", "render_done"];
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn asked(body: Value) -> Answer<(Request, NewRequest)> {
-        serde_json::from_value::<NewRequest>(body)
-            .map_err(|e| e.to_string())?
-            .checked()
-    }
-
-    #[test]
-    fn a_request_is_made_in_hebrew_and_english_unless_more_are_chosen() {
-        let (request, _) = asked(json!({"prompt": "an invitation"})).expect("a request");
-        assert_eq!(request.languages, Some(languages::base()));
-        let (request, _) = asked(
-            json!({"prompt": "an invitation", "languages": ["ja", "ar", "JA", "pt-br", "en"]}),
-        )
-        .expect("a request");
-        assert_eq!(
-            request.languages,
-            Some(["he", "en", "ar", "pt-BR", "ja"].map(String::from).to_vec())
-        );
-        assert!(
-            asked(json!({"prompt": "an invitation", "languages": ["de", "xx"]}))
-                .is_err_and(|e| e.contains("Unknown language xx"))
-        );
-        assert!(asked(json!({"prompt": "x", "model": "gpt"})).is_err());
-    }
-
-    #[test]
-    fn a_template_request_keeps_exactly_its_languages() {
-        let (request, _) = asked(
-            json!({"kind": "template", "templateId": "mifgash", "languages": ["de", "AR", "de"]}),
-        )
-        .expect("a request");
-        assert_eq!(
-            request.languages,
-            Some(["ar", "de"].map(String::from).to_vec())
-        );
-        // A design, or a request the studio is to read, still gets Hebrew and English.
-        let (request, _) =
-            asked(json!({"kind": "auto", "prompt": "translate Mifgash"})).expect("a request");
-        assert_eq!(request.languages, Some(languages::base()));
-    }
-}

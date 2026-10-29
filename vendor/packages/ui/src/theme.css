@@ -1,0 +1,368 @@
+/*
+ * Slidr design tokens (SPEC 4.0, DSN-01, DSN-02). Every colour, size, radius, shadow, type size
+ * and duration a component uses comes from here; Tailwind's default scales are switched off, so
+ * a class that is not a token does not exist.
+ *
+ * Colours are `light-dark(light, dark)` pairs. `color-scheme` picks the side: by default it
+ * follows the OS, and `data-theme="light" | "dark"` on any element switches its subtree.
+ *
+ * Names: the app's colours are `--color-ui-*` (classes `bg-ui-panel`, `text-ui-fg-muted`). The
+ * slide renderer sets `--color-bg`, `--color-text`, `--color-accent`, `--font-body` and the rest of
+ * the deck theme on every slide root (SPEC RND-08); the `ui-` prefix keeps the two apart.
+ */
+
+@source '.';
+
+@theme static {
+  --color-*: initial;
+  --radius-*: initial;
+  --shadow-*: initial;
+  --inset-shadow-*: initial;
+  --drop-shadow-*: initial;
+  --text-shadow-*: initial;
+  --blur-*: initial;
+  --text-*: initial;
+  --font-*: initial;
+  --ease-*: initial;
+  --animate-*: initial;
+
+  /* Surfaces, from the window frame inwards. */
+  --color-ui-chrome: light-dark(#f8f7fc, #191721); /* Activity Bar, status bar */
+  --color-ui-panel: light-dark(#ffffff, #211e2b); /* Top Tools, Tool Panel, Filmstrip */
+  --color-ui-canvas: light-dark(#f0eef7, #14111c); /* behind the slide on the Stage */
+  --color-ui-raised: light-dark(#ffffff, #2b2737); /* menus, popovers, dialogs */
+  --color-ui-field: light-dark(#f5f3fa, #2a2635); /* inputs and tracks */
+  --color-ui-hover: light-dark(#18181b0d, #ffffff0f);
+  --color-ui-pressed: light-dark(#18181b17, #ffffff1a);
+  --color-ui-thumb: light-dark(#ffffff, #3b3b42); /* the selected segment of a segmented control */
+  /* Under art drawn in dark line for a light page: nothing in light, a sheet of paper in dark. */
+  --color-ui-paper: light-dark(#18181b00, #e6e4ee);
+  --color-ui-paper-hover: light-dark(#18181b0d, #ffffff);
+  --color-ui-scrim: light-dark(#18181b47, #0000008c);
+
+  /* Text, icons and lines. `fg` and `fg-muted` pass AA on every surface; `fg-subtle` is for
+     disabled controls and decoration only. */
+  --color-ui-fg: light-dark(#18181b, #ededef);
+  --color-ui-fg-muted: light-dark(#5f5f6a, #a1a1aa);
+  --color-ui-fg-subtle: light-dark(#a8a8b1, #5a5a63);
+  --color-ui-line: light-dark(#e6e6ea, #2a2a2f);
+  --color-ui-line-strong: light-dark(#d2d2d8, #3b3b42);
+
+  /* Main action, selection, focus and AI. */
+  --color-ui-accent: light-dark(#7c3aed, #8045e6);
+  --color-ui-accent-hover: light-dark(#6d28d9, #8b50ed);
+  --color-ui-accent-pressed: light-dark(#5b21b6, #7033d1);
+  --color-ui-on-accent: light-dark(#ffffff, #ffffff);
+  --color-ui-accent-soft: light-dark(#f0e8ff, #3b2858); /* selected items, AI tint */
+  --color-ui-accent-soft-hover: light-dark(#e6d8ff, #4a336d);
+  --color-ui-accent-fg: light-dark(#6d28d9, #ceb1ff);
+  --color-ui-focus: light-dark(#7c3aed, #bc91ff);
+
+  /* Header and creation tools: paired foregrounds keep coloured controls readable. */
+  --color-ui-header-start: light-dark(#087e8b, #075b65);
+  --color-ui-header-middle: light-dark(#4c50c8, #373888);
+  --color-ui-header-end: light-dark(#8534d5, #612694);
+  --color-ui-header-fg: #ffffff;
+  --color-ui-header-hover: #ffffff24;
+  --color-ui-header-pressed: #ffffff38;
+  --color-ui-header-line: #ffffff40;
+  --color-ui-header-action: #ffffff;
+  --color-ui-header-action-hover: #f0e8ff;
+  --color-ui-header-action-pressed: #e6d8ff;
+  --color-ui-header-action-fg: #6425b6;
+  --color-ui-header-spark: #ffc94d; /* the spark of the Slidr mark */
+  --color-ui-tool-violet: light-dark(#ede5ff, #3b2858);
+  --color-ui-tool-violet-fg: light-dark(#7030c9, #ceb1ff);
+  --color-ui-tool-blue: light-dark(#e3efff, #223858);
+  --color-ui-tool-blue-fg: light-dark(#245cc5, #a1c5ff);
+  --color-ui-tool-pink: light-dark(#fbe5f4, #4d2744);
+  --color-ui-tool-pink-fg: light-dark(#a32c80, #ffb0e4);
+  --color-ui-tool-teal: light-dark(#dbf4f3, #1c3c3c);
+  --color-ui-tool-teal-fg: light-dark(#08766f, #79ddd4);
+  --color-ui-tool-green: light-dark(#e2f4e8, #253d2f);
+  --color-ui-tool-green-fg: light-dark(#247340, #9cdeb0);
+  --color-ui-tool-orange: light-dark(#fff0db, #493423);
+  --color-ui-tool-orange-fg: light-dark(#a4590e, #ffd09a);
+  --color-ui-tool-rose: light-dark(#ffe5eb, #4c2934);
+  --color-ui-tool-rose-fg: light-dark(#b82d56, #ffabc2);
+
+  /* Status. */
+  --color-ui-danger: light-dark(#c42b1c, #c42b1c);
+  --color-ui-danger-hover: light-dark(#b02416, #d4372a);
+  --color-ui-on-danger: light-dark(#ffffff, #ffffff);
+  --color-ui-danger-fg: light-dark(#c42b1c, #ff8f85);
+  --color-ui-danger-soft: light-dark(#fdeeec, #3a1d1b);
+  --color-ui-success-fg: light-dark(#17784b, #4cc38a);
+  --color-ui-warning-fg: light-dark(#9e5200, #f0a32b);
+
+  /* Tooltips are inverted, so they read as a different layer. */
+  --color-ui-tooltip: light-dark(#1f1f23, #3d3d44);
+  --color-ui-on-tooltip: light-dark(#f4f4f6, #f4f4f6);
+
+  /* Spacing: a 4px grid, so `p-2` is 8px and `gap-3` is 12px. */
+  --spacing: 4px;
+  /* Named sizes (`h-control`, `w-activitybar`): controls and the FHD regions of SPEC 4.1. */
+  --spacing-control: 32px;
+  --spacing-control-sm: 28px;
+  --spacing-titlebar: 56px;
+  --spacing-caption: 46px; /* a window control button */
+  --spacing-toolbar: 44px;
+  --spacing-filmstrip: 96px;
+  --spacing-statusbar: 32px;
+  --spacing-activitybar: 76px;
+  --spacing-thumb-w: 160px; /* a filmstrip thumbnail, 160 × 90 (FLM-01) */
+  --spacing-thumb-h: 90px;
+  --spacing-menu: 224px; /* the minimum width of a menu */
+  --spacing-dialog: 440px;
+  --spacing-dialog-wide: 720px; /* a dialog with a slide or a picture in it */
+  --spacing-dialog-body: min(520px, calc(100vh - 200px)); /* a dialog's pages, that scroll */
+  --spacing-popover: 288px;
+  --spacing-font-picker: 360px;
+  --spacing-font-row: 44px;
+  --spacing-font-list: 396px; /* nine font previews */
+  /* As wide as the window, short of a margin on either side: a popover that must not run off it. */
+  --spacing-in-window: calc(100vw - 4 * var(--spacing));
+
+  /* Subtle corners for controls and floating surfaces, with smaller nested corners. */
+  --radius-small: 4px;
+  --radius-inset: 4px;
+  --radius-control: 6px;
+  --radius-panel: 8px;
+  --radius-full: 9999px;
+
+  /* Depth: surfaces are told apart by tone; one soft shadow for whatever floats. */
+  --shadow-raised: 0 1px 2px light-dark(#18181b14, #00000066);
+  --shadow-overlay:
+    0 12px 32px -8px light-dark(#18181b29, #000000a6), 0 2px 6px light-dark(#18181b0f, #00000052);
+  --shadow-floating:
+    0 4px 16px -4px light-dark(#46236b26, #00000066), 0 1px 3px light-dark(#46236b14, #00000040);
+  --shadow-slide:
+    0 1px 2px light-dark(#18181b14, #00000066), 0 8px 28px light-dark(#18181b14, #0000004d);
+
+  /* Type: Inter for Latin, Heebo for Hebrew (each covers what the other lacks). */
+  --font-ui: 'Inter Variable', 'Heebo Variable', system-ui, sans-serif;
+  /* Code and whatever must line up in columns: `font-mono`, and Tailwind's base styles give it
+     to `code`, `pre` and `kbd` as well. JetBrains Mono is in the built-in font library, which
+     the app registers under this name. It has no Hebrew, and neither have Consolas and the
+     Cascadia Mono that Windows 11 ships; Courier New, which every Windows has, does. */
+  --font-mono: 'JetBrains Mono', 'Cascadia Mono', Consolas, 'Courier New', monospace;
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700; /* the Slidr wordmark */
+  /* Captions under icons in a narrow rail (the Activity Bar), where a whole word has to fit. */
+  --text-2xs: 11px;
+  --text-2xs--line-height: 14px;
+  --text-xs: 12px;
+  --text-xs--line-height: 16px;
+  --text-sm: 13px;
+  --text-sm--line-height: 20px;
+  --text-md: 14px;
+  --text-md--line-height: 20px;
+  --text-lg: 16px;
+  --text-lg--line-height: 24px;
+  /* The title bar: the app's name and, beside it, the tagline or the document's name. */
+  --text-header: 18px;
+  --text-header--line-height: 24px;
+  --text-xl: 20px;
+  --text-xl--line-height: 28px;
+  --default-font-family: var(--font-ui);
+
+  /* Motion: 120–200ms. Nothing jumps and nothing lingers. */
+  --duration-fast: 120ms;
+  --duration-base: 160ms;
+  --duration-slow: 200ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --default-transition-duration: var(--duration-fast);
+  --default-transition-timing-function: var(--ease-standard);
+  --animate-overlay-in: ui-overlay-in var(--duration-base) var(--ease-out);
+  --animate-fade-in: ui-fade-in var(--duration-base) var(--ease-out);
+  --animate-panel-in: ui-panel-in var(--duration-slow) var(--ease-out) backwards;
+  --animate-shimmer: ui-shimmer 1.6s linear infinite;
+  --animate-spin: ui-spin 0.8s linear infinite;
+
+  @keyframes ui-overlay-in {
+    from {
+      opacity: 0;
+      transform: translateY(-2px) scale(0.98);
+    }
+  }
+  @keyframes ui-fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+  /* The content of a panel or a tab that takes the place of another: it settles, it does not fly. */
+  @keyframes ui-panel-in {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+  @keyframes ui-shimmer {
+    from {
+      background-position: 100% 0;
+    }
+    to {
+      background-position: -100% 0;
+    }
+  }
+  @keyframes ui-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+}
+
+/*
+ * Interaction states also answer to `data-preview`, so the component gallery (DSN-06) can show
+ * hover, pressed and focus without a pointer. Components use the usual `hover:`, `active:` and
+ * `focus-visible:` variants.
+ */
+@custom-variant hover {
+  @media (hover: hover) {
+    &:hover {
+      @slot;
+    }
+  }
+  &[data-preview~='hover'] {
+    @slot;
+  }
+}
+@custom-variant active (&:active, &[data-preview~='active']);
+@custom-variant focus-visible (&:focus-visible, &[data-preview~='focus']);
+@custom-variant focus-within (&:focus-within, &[data-preview~='focus']);
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/*
+ * The list of the font picker no taller than the popover has room for, under the search field and
+ * the popover's padding, and never shorter than one row. Read where it is drawn: the room is the
+ * popover's own variable, which Radix sets on the popover and not on the page.
+ */
+@utility max-h-font-list-room {
+  max-height: max(
+    var(--spacing-font-row),
+    calc(
+      var(--radix-popover-content-available-height, 100vh) - var(--spacing-control) - 8 *
+        var(--spacing)
+    )
+  );
+}
+
+/* The loading placeholder (Skeleton): a field-coloured block with a slow sheen. */
+@utility skeleton {
+  background-color: var(--color-ui-field);
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--color-ui-hover) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
+  /* The letters neither Inter nor Heebo has come from the system's faces (`system-ui`), which
+     Chromium picks by the page's language: Segoe UI for Arabic, Nirmala UI for Hindi, Malgun
+     Gothic and Microsoft YaHei UI for Korean and Chinese. For Japanese it picks Yu Gothic, whose
+     kana are a full em wide and set the words of a menu apart; Windows draws its own interface in
+     Yu Gothic UI, a quarter narrower. */
+  :root:lang(ja) {
+    --font-ui: 'Inter Variable', 'Heebo Variable', 'Yu Gothic UI', system-ui, sans-serif;
+  }
+  [data-theme='light'] {
+    color-scheme: light;
+  }
+  [data-theme='dark'] {
+    color-scheme: dark;
+  }
+  /* A colour computes where it is declared, so every theme boundary restates the text colour. */
+  :root,
+  [data-theme] {
+    color: var(--color-ui-fg);
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    background-color: var(--color-ui-chrome);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+    font-optical-sizing: auto;
+    -webkit-font-smoothing: antialiased;
+    overflow: hidden;
+    /* A desktop app: the chrome is not a document to select. Fields opt back in. */
+    user-select: none;
+  }
+  input,
+  textarea,
+  [contenteditable='true'] {
+    user-select: text;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklab, var(--color-ui-accent) 30%, transparent);
+  }
+
+  /* One focus ring everywhere (DSN-08); components only change its offset. */
+  :focus-visible,
+  [data-preview~='focus'] {
+    outline: 2px solid var(--color-ui-focus);
+    outline-offset: 2px;
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* No OS scrollbars, even where a plain overflow container slips through. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-ui-line-strong);
+    background-clip: padding-box;
+    border: 3px solid transparent;
+    border-radius: var(--radius-full);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-ui-fg-subtle);
+  }
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
+
+  /*
+   * Not inside a slide (`.slidr-slide`, the root the renderer draws): there a duration on every
+   * element makes every change of a style a transition, the layout stays the old one for a
+   * frame, and whatever measures the slide right after a change reads it. The slide's own motion
+   * is the runtime's, which does not go through CSS.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    :not(.slidr-slide, .slidr-slide *),
+    :not(.slidr-slide, .slidr-slide *)::before,
+    :not(.slidr-slide, .slidr-slide *)::after {
+      animation-duration: 1ms !important;
+      transition-duration: 1ms !important;
+    }
+  }
+}
+
+/* Filmstrip reserves this scrollbar height separately from its thumbnail padding. */
+[data-filmstrip]::-webkit-scrollbar {
+  height: 6px;
+}
+[data-filmstrip]::-webkit-scrollbar-thumb {
+  border-width: 1px;
+}

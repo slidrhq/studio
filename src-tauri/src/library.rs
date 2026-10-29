@@ -5,7 +5,9 @@
 //! of it, and never writes it.
 //!
 //! Its approved work goes to Slidr Library's upload API (`uploads.rs`; the library's README,
-//! "Uploading"): a design as `designs: add`, a template's sample as `templates: translate`. The
+//! "Uploading"): a design as `designs: add`, then its search tags in every language it has them in
+//! as `designs: tag` (`add` takes Hebrew and English only), a template's sample as
+//! `templates: translate`. The
 //! library checks each against what it publishes. Sent with a token that publishes, an upload is
 //! published at once, or waits in the library and says why: publishing is the library's business,
 //! and the studio only keeps each upload's status, and marks the variants whose uploads were
@@ -30,7 +32,9 @@ use crate::{
     render::render_dir,
     store::{Published, Store, Tags, Upload, Variant, now, read_json},
     templates::Templates,
-    uploads::{LibraryApi, Transport, design_upload, drawing_upload, https, sample_upload},
+    uploads::{
+        LibraryApi, Transport, design_upload, drawing_upload, https, sample_upload, tags_upload,
+    },
 };
 
 /// The catalog of the designs (ADR-118 of the app).
@@ -38,59 +42,6 @@ pub const INDEX: &str = "elements/designs/index.json";
 /// The catalog of the designs the studio made, of a library not published since the two were
 /// made one: its next publication folds it into the other.
 pub const MANAGED: &str = "elements/designs/managed.json";
-/// Most search tags kept in a language, and fewest a language must have for any to be kept.
-const MOST_TAGS: usize = 20;
-const FEWEST_TAGS: usize = 3;
-
-fn niqqud(c: char) -> bool {
-    ('\u{0591}'..='\u{05C7}').contains(&c)
-}
-
-fn hebrew_letter(c: char) -> bool {
-    ('א'..='ת').contains(&c)
-}
-
-/// The search tags of a design as the catalog keeps them (ADR-108 of the app): `{he, en}`, each a
-/// list of short words, English in lower case, Hebrew in Hebrew letters and without niqqud, none
-/// twice. None when either language has too few.
-pub fn design_tags(value: Option<&Value>) -> Option<Tags> {
-    let value = value?.as_object()?;
-    let mut tags = Tags::default();
-    for lang in BASE_LANGUAGES {
-        let mut kept: Vec<String> = Vec::new();
-        for tag in items(value.get(lang)) {
-            let Some(tag) = tag.as_str() else {
-                continue;
-            };
-            let text = tag.split_whitespace().collect::<Vec<_>>().join(" ");
-            let text = if lang == "he" {
-                text.chars().filter(|c| !niqqud(*c)).collect::<String>()
-            } else {
-                text.to_lowercase()
-            };
-            let hebrew = text.chars().any(hebrew_letter);
-            if text.is_empty()
-                || text.chars().count() > 40
-                || hebrew != (lang == "he")
-                || kept.contains(&text)
-            {
-                continue;
-            }
-            kept.push(text);
-        }
-        if kept.len() < FEWEST_TAGS {
-            return None;
-        }
-        kept.truncate(MOST_TAGS);
-        if lang == "he" {
-            tags.he = kept;
-        } else {
-            tags.en = kept;
-        }
-    }
-    Some(tags)
-}
-
 /// The size of the picture of a design's slide that the galleries show, made ahead (ADR-109 and
 /// ADR-111 of the app): what the render draws as `<lang>-gallery`, and the library takes as
 /// `thumb-<lang>`.
@@ -368,9 +319,14 @@ impl Library {
             "subject": result.get("subject").cloned().unwrap_or(Value::Null),
             "size": [width, height],
         });
-        let tags = serde_json::to_value(&brief.tags).ok();
-        if let Some(tags) = design_tags(tags.as_ref()) {
-            record["tags"] = json!(tags);
+        // The tags of every language, in the registry's order; `add` carries Hebrew and English.
+        let tags: Map<String, Value> = CONTENT_LANGUAGES
+            .iter()
+            .filter(|lang| brief.tags.has(lang))
+            .map(|lang| ((*lang).to_owned(), json!(brief.tags.get(lang))))
+            .collect();
+        if !tags.is_empty() {
+            record["tags"] = Value::Object(tags);
         }
         Ok(DesignUpload {
             thumbs: self.gallery_pictures(variant, &langs),
@@ -403,6 +359,8 @@ impl Library {
     pub async fn upload(&self, vids: &[String]) -> Vec<Value> {
         let api = self.api();
         let mut results = Vec::new();
+        // The designs published now, whose tags in the other languages go after them.
+        let mut tagged: BTreeMap<String, (String, Tags)> = BTreeMap::new();
         for vid in vids {
             let Some(variant) = self.store.variant(vid) else {
                 continue;
@@ -438,12 +396,69 @@ impl Library {
                 Ok(answer) => self.settle(vid, &answer),
                 Err((error, issues)) => json!({"variantId": vid, "error": error, "issues": issues}),
             };
+            if item["status"] == "published"
+                && let (Some(did), Some(brief)) = (&variant.design_id, variant.brief.design())
+                && brief
+                    .tags
+                    .0
+                    .keys()
+                    .any(|lang| !BASE_LANGUAGES.contains(&lang.as_str()))
+            {
+                tagged.insert(did.clone(), (vid.clone(), brief.tags.clone()));
+            }
             results.push(item);
+        }
+        if !tagged.is_empty() {
+            let note = self.send_tags(&api, &tagged).await;
+            for item in &mut results {
+                let tagged_here = item["variantId"]
+                    .as_str()
+                    .is_some_and(|vid| tagged.values().any(|(v, _)| v == vid));
+                if tagged_here && let Some(note) = &note {
+                    item["tagsError"] = json!(note);
+                }
+            }
         }
         if results.iter().any(|item| item["status"] == "published") {
             self.templates.forget().await;
         }
         results
+    }
+
+    /// Sends the search tags of these published designs in every language they have them in, as
+    /// one `designs: tag`; why it was not taken, when it was not. The library keeps each design's
+    /// tags as the upload gives them, so every language of each goes, Hebrew and English too.
+    async fn send_tags(
+        &self,
+        api: &LibraryApi,
+        tagged: &BTreeMap<String, (String, Tags)>,
+    ) -> Option<String> {
+        let items: BTreeMap<String, Tags> = tagged
+            .iter()
+            .map(|(did, (_, tags))| (did.clone(), tags.clone()))
+            .collect();
+        let upload = tags_upload("designs", &items)?;
+        match api.send(&upload, &[]).await {
+            Ok(answer) if answer["status"] == "published" => {
+                for (vid, _) in tagged.values() {
+                    self.store.log(
+                        vid,
+                        "publish",
+                        "Its search tags in every language were published.",
+                    );
+                }
+                None
+            }
+            Ok(answer) => Some(format!(
+                "The search tags in the other languages wait in the library ({}): {}",
+                answer["status"].as_str().unwrap_or("?"),
+                why_it_waits(&answer).unwrap_or("no reason given")
+            )),
+            Err(error) => Some(format!(
+                "The library did not take the search tags in the other languages: {}",
+                error.message
+            )),
+        }
     }
 
     /// What the library answered of an upload, kept by its variant: its status, and when it was
@@ -633,27 +648,6 @@ mod tests {
     }
 
     #[test]
-    fn tags_are_kept_clean_and_in_their_own_letters() {
-        let tags = design_tags(Some(&json!({
-            "he": ["יוֹם הולדת", "יום הולדת", "birthday", "מסיבה", " עוגה ", 7],
-            "en": ["Birthday", "kids  party", "מסיבה", "cake", "x".repeat(41)],
-        })));
-        assert_eq!(
-            tags,
-            Some(Tags {
-                he: vec!["יום הולדת".into(), "מסיבה".into(), "עוגה".into()],
-                en: vec!["birthday".into(), "kids party".into(), "cake".into()],
-            })
-        );
-        assert_eq!(
-            design_tags(Some(&json!({"he": ["א", "ב"], "en": ["a", "b", "c"]}))),
-            None
-        );
-        assert_eq!(design_tags(None), None);
-        assert_eq!(design_tags(Some(&json!({"he": "יום"}))), None);
-    }
-
-    #[test]
     fn a_design_is_uploaded_with_a_slide_for_every_language() {
         let dir = tempfile::tempdir().expect("a folder");
         let (library, store) = library(dir.path(), Pages::new(&[]));
@@ -709,16 +703,23 @@ mod tests {
         assert!(record.get("tags").is_none());
         let mut tagged = variant.clone();
         if let Brief::Design(brief) = &mut tagged.brief {
-            brief.tags = Tags {
-                he: vec!["הזמנה".into(), "מסיבה".into(), "אירוע".into()],
-                en: vec!["Invitation".into(), "party".into(), "event".into()],
-            };
+            brief.tags = crate::tags::clean_tags(Some(&json!({
+                "fr": ["invitation", "fête", "événement"],
+                "he": ["הזמנה", "מסיבה", "אירוע"],
+                "en": ["Invitation", "party", "event"],
+            })));
         }
         let record = library.design_record(&tagged).expect("a record").record;
         assert_eq!(
             record["tags"],
-            json!({"he": ["הזמנה", "מסיבה", "אירוע"], "en": ["invitation", "party", "event"]})
+            json!({"he": ["הזמנה", "מסיבה", "אירוע"], "en": ["invitation", "party", "event"],
+                   "fr": ["invitation", "fête", "événement"]})
         );
+        let order: Vec<&String> = record["tags"]
+            .as_object()
+            .map(|t| t.keys().collect())
+            .unwrap_or_default();
+        assert_eq!(order, ["he", "en", "fr"]);
         // Without the English slide it is not uploaded.
         sides.as_object_mut().map(|s| s.shift_remove("en"));
         write_json(&work.join("renders/r1/result.json"), &result(&sides)).expect("written");

@@ -1,4 +1,5 @@
 import { fileURLToPath } from 'node:url';
+import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
@@ -7,7 +8,7 @@ import { defineConfig } from 'vite';
 // Tauri serves the build (src-tauri/tauri.conf.json), and the dev server while the studio is
 // worked on (`pnpm tauri dev`).
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   clearScreen: false,
   server: {
     host: '127.0.0.1',
