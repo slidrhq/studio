@@ -59,12 +59,14 @@ export function SlideView({
   const data = result ?? fetched;
   const [ref, measured] = useWidth<HTMLDivElement>();
   const width = fixed ?? measured;
+  // Of the picture's address and size, not of the variant: a working variant changes with every
+  // line of its log, and a new picture is a new deck, which draws the whole slide again.
+  const url = variant.image ? pictureUrl(variant) : undefined;
+  const pictureWidth = variant.image?.width ?? 0;
+  const pictureHeight = variant.image?.height ?? 0;
   const picture = useMemo(
-    () =>
-      variant.image
-        ? { url: pictureUrl(variant), width: variant.image.width, height: variant.image.height }
-        : undefined,
-    [variant],
+    () => (url === undefined ? undefined : { url, width: pictureWidth, height: pictureHeight }),
+    [url, pictureWidth, pictureHeight],
   );
   // A variant not made in the language asked for is shown in English, as the app gives it.
   const shown = data ? pieceLanguage(data.langs, lang) : lang;

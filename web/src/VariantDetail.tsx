@@ -195,9 +195,9 @@ export function DetailFrame({
 export function VariantDetail({ variant, onClose }: { variant: Variant; onClose: () => void }) {
   const t = useT();
   const [uiLang] = useLang();
-  const ui = useUi();
+  const displayLang = useUi((ui) => ui.displayLang);
   const approve = useApprove();
-  const [lang, setLang] = useState<Lang>(ui.displayLang ?? uiLang);
+  const [lang, setLang] = useState<Lang>(displayLang ?? uiLang);
   const [imageNote, setImageNote] = useState('');
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState(false);
@@ -259,7 +259,8 @@ export function VariantDetail({ variant, onClose }: { variant: Variant; onClose:
       stage={
         render ? (
           <>
-            <div className="overflow-hidden rounded-panel shadow-slide">
+            {/* Its own height: in the column, a box that hides its overflow may shrink to none. */}
+            <div className="shrink-0 overflow-hidden rounded-panel shadow-slide">
               <SlideView variant={variant} lang={shown} result={result} />
             </div>
             <h3 className="text-sm font-semibold">{t('variant.galleryPreview')}</h3>

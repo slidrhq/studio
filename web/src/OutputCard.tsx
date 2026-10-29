@@ -24,7 +24,7 @@ import {
   Square,
   Trash2,
 } from '@slidr/ui/icons';
-import { useState, type ReactNode } from 'react';
+import { memo, useState, type ReactNode } from 'react';
 import { api, isRunning, isTemplate, renderPicture, type Lang, type Variant } from './api';
 import { useT, type MessageKey } from './i18n';
 import { STAGE } from './labels';
@@ -179,8 +179,11 @@ function Preview({ variant, lang }: { variant: Variant; lang: Lang }) {
  * close; its box selects it, for the chat to change or to approve with others; its button
  * approves it. `children` is room for many items in one card, as a request of graphics or emoji
  * will have (one card a request, holding what it made).
+ *
+ * Drawn again only when its props change: a working variant changes with every line of its log,
+ * and the other cards of the panel stay as they are.
  */
-export function OutputCard({
+export const OutputCard = memo(function OutputCard({
   variant,
   lang,
   selected,
@@ -353,4 +356,4 @@ export function OutputCard({
       </div>
     </article>
   );
-}
+});

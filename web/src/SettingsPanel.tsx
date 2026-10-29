@@ -245,10 +245,10 @@ function Programs({ status }: { status?: ServerStatus }) {
 
 function Agents({ status }: { status?: ServerStatus }) {
   const t = useT();
-  const studio = useStudio();
+  const saved = useStudio((studio) => studio.settings);
   const [draft, setDraft] = useState<StudioSettings>();
   const [error, setError] = useState<string>();
-  const settings = draft ?? studio.settings;
+  const settings = draft ?? saved;
   const save = (next: StudioSettings) => {
     setDraft(next);
     setError(undefined);

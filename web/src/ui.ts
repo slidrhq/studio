@@ -87,14 +87,21 @@ export function setUi(change: Partial<UiState> | ((now: UiState) => Partial<UiSt
   for (const listener of listeners) listener();
 }
 
-export function useUi(): UiState {
-  return useSyncExternalStore(
-    (listener) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    () => state,
-  );
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+};
+
+/**
+ * What the window shows, or the part of it `select` picks: a component is drawn again only when
+ * that part changes. The composer's draft changes with every key, so a component that reads the
+ * whole state is drawn with every key too. `select` must answer a value of the state as it is
+ * (a field, an array of it), not a new object: a new one each time is a change each time.
+ */
+export function useUi(): UiState;
+export function useUi<T>(select: (state: UiState) => T): T;
+export function useUi<T>(select?: (state: UiState) => T): T | UiState {
+  return useSyncExternalStore(subscribe, () => (select ? select(state) : state));
 }
 
 export const getUi = () => state;

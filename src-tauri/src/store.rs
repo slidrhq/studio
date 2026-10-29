@@ -962,13 +962,30 @@ impl Store {
         Some(out)
     }
 
-    /// A line of a variant's log, written at once.
+    /// A line of a variant's log, written at once. Only the line is sent (`variantLog`): the
+    /// variant whole carries its log, up to `LOG_LIMIT` lines, and an agent's turn writes a line
+    /// with each tool call and passage of text.
     pub fn log(&self, vid: &str, kind: &str, text: impl Into<String>) {
-        let text = text.into();
-        self.update_variant(vid, |variant| variant.push_log(kind, text));
+        let mut state = self.state();
+        let Some(variant) = state.variants.get_mut(vid) else {
+            return;
+        };
+        variant.push_log(kind, text);
+        self.write_variant(variant);
+        (self.emit)(json!({
+            "type": "variantLog",
+            "id": vid,
+            "entry": variant.log.last(),
+            "updatedAt": variant.updated_at,
+        }));
     }
 
     fn save_variant(&self, variant: &mut Variant) {
+        self.write_variant(variant);
+        (self.emit)(json!({ "type": "variant", "variant": variant }));
+    }
+
+    fn write_variant(&self, variant: &mut Variant) {
         variant.updated_at = now();
         if let Err(error) = write_json(&self.variant_dir(variant).join("state.json"), variant) {
             eprintln!(
@@ -976,7 +993,6 @@ impl Store {
                 variant.id
             );
         }
-        (self.emit)(json!({ "type": "variant", "variant": variant }));
     }
 }
 
@@ -1125,6 +1141,48 @@ pub mod tests {
                 .is_none()
         );
         assert!(!store.request_dir(&request.id).exists());
+    }
+
+    #[test]
+    fn a_line_of_the_log_is_sent_alone_and_written() {
+        let dir = tempfile::tempdir().expect("a folder");
+        let sent = Arc::new(Mutex::new(Vec::<Value>::new()));
+        let heard = Arc::clone(&sent);
+        let sending = Store::new(
+            dir.path().join("requests"),
+            Arc::new(move |event| heard.lock().expect("the events").push(event)),
+        );
+        let request = sending.create_request(Request::draft(RequestKind::Design, "x".into()));
+        let variant = sending
+            .create_variant(&request.id, design_brief(), NewVariant::default())
+            .expect("a variant");
+        sent.lock().expect("the events").clear();
+
+        sending.log(&variant.id, "tool", "Read en.html");
+        let events = sent.lock().expect("the events").clone();
+        assert_eq!(events.len(), 1);
+        assert_eq!(events[0]["type"], "variantLog");
+        assert_eq!(events[0]["id"], variant.id.as_str());
+        assert_eq!(events[0]["entry"]["kind"], "tool");
+        assert_eq!(events[0]["entry"]["text"], "Read en.html");
+        assert!(events[0]["updatedAt"].as_f64().is_some_and(|t| t > 0.0));
+
+        // A variant changed otherwise is still sent whole.
+        sending.update_variant(&variant.id, |v| v.reviews += 1);
+        let events = sent.lock().expect("the events").clone();
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[1]["type"], "variant");
+        assert_eq!(events[1]["variant"]["log"][0]["text"], "Read en.html");
+
+        // A line of a variant that is gone is neither sent nor written.
+        sending.log("v-gone", "tool", "x");
+        assert_eq!(sent.lock().expect("the events").len(), 2);
+
+        let read = store(dir.path());
+        read.load();
+        let read = read.variant(&variant.id).expect("the variant");
+        assert_eq!(read.log.len(), 1);
+        assert_eq!(read.log[0].text, "Read en.html");
     }
 
     #[test]

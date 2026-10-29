@@ -62,13 +62,14 @@ const message = (failure: unknown) =>
 
 /** The requests of a chat that are still at work: planning, or making their outputs. */
 function useRunning(chat?: Chat) {
-  const studio = useStudio();
-  return studio.requests.filter(
+  const requests = useStudio((studio) => studio.requests);
+  const variants = useStudio((studio) => studio.variants);
+  return requests.filter(
     (request) =>
       chat !== undefined &&
       request.chatId === chat.id &&
       (request.status === 'planning' ||
-        request.variantIds.some((vid) => studio.variants[vid] && isRunning(studio.variants[vid]))),
+        request.variantIds.some((vid) => variants[vid] && isRunning(variants[vid]))),
   );
 }
 
@@ -391,7 +392,8 @@ function ChangeTurn({
 }
 
 function Messages({ chat }: { chat: Chat }) {
-  const studio = useStudio();
+  const requests = useStudio((studio) => studio.requests);
+  const variants = useStudio((studio) => studio.variants);
   const end = useRef<HTMLDivElement>(null);
   const length = chat.messages.length;
   useEffect(() => {
@@ -399,25 +401,23 @@ function Messages({ chat }: { chat: Chat }) {
     end.current?.scrollIntoView({ block: 'end' });
   }, [length, chat.id]);
   const byId = useMemo(
-    () => Object.fromEntries(studio.requests.map((request) => [request.id, request])),
-    [studio.requests],
+    () => Object.fromEntries(requests.map((request) => [request.id, request])),
+    [requests],
   );
   const variantsOf = (request: StudioRequest) =>
-    request.variantIds.flatMap((vid) => (studio.variants[vid] ? [studio.variants[vid]] : []));
+    request.variantIds.flatMap((vid) => (variants[vid] ? [variants[vid]] : []));
   return (
     <div className="flex flex-col gap-4 px-4 pt-1 pb-3">
       {chat.messages.map((entry) =>
         entry.role === 'user' ? (
           <div key={entry.id} className="flex flex-col gap-3">
-            <UserMessage entry={entry} variants={studio.variants} />
+            <UserMessage entry={entry} variants={variants} />
             {(entry.requestIds ?? []).map((rid) =>
               byId[rid] ? (
                 <RequestTurn key={rid} request={byId[rid]} variants={variantsOf(byId[rid])} />
               ) : null,
             )}
-            {(entry.refs?.length ?? 0) > 0 && (
-              <ChangeTurn entry={entry} variants={studio.variants} />
-            )}
+            {(entry.refs?.length ?? 0) > 0 && <ChangeTurn entry={entry} variants={variants} />}
           </div>
         ) : (
           <p key={entry.id} dir="auto" className="text-md leading-6 whitespace-pre-wrap">
@@ -531,10 +531,14 @@ const COUNTS = ['', '1', '2', '3', '4', '6', '8', '10', '12'] as const;
 function Composer({ chat }: { chat?: Chat }) {
   const t = useT();
   const [lang] = useLang();
-  const studio = useStudio();
-  const ui = useUi();
+  const variants = useStudio((studio) => studio.variants);
+  const settings = useStudio((studio) => studio.settings);
+  const kind = useUi((ui) => ui.kind);
+  const selected = useUi((ui) => ui.selected);
+  const focusComposer = useUi((ui) => ui.focusComposer);
+  const pendingAgents = useUi((ui) => ui.pendingAgents);
   const field = useRef<HTMLTextAreaElement>(null);
-  const text = ui.draft;
+  const text = useUi((ui) => ui.draft);
   const setText = (draft: string) => setUi({ draft });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string>();
@@ -542,24 +546,24 @@ function Composer({ chat }: { chat?: Chat }) {
   const [templates, setTemplates] = useState<TemplateInfo[]>();
   const [templateId, setTemplateId] = useState('');
   const [sampleLangs, setSampleLangs] = useState<Lang[]>([]);
-  const info = kindInfo(ui.kind);
-  const refs = ui.selected.filter((vid) => studio.variants[vid]);
+  const info = kindInfo(kind);
+  const refs = selected.filter((vid) => variants[vid]);
   const editing = refs.length > 0;
 
   useEffect(() => {
     field.current?.focus();
-  }, [ui.focusComposer]);
+  }, [focusComposer]);
   useEffect(() => {
-    if (ui.kind !== 'template' || templates) return;
+    if (kind !== 'template' || templates) return;
     api.templates().then(
       ({ templates: read }) => setTemplates(read),
       (failure: unknown) => setError(message(failure)),
     );
-  }, [ui.kind, templates]);
+  }, [kind, templates]);
   const template = templates?.find((one) => one.id === templateId);
 
-  const own: Partial<Agents> = chat ? (chat.agents ?? {}) : (ui.pendingAgents ?? {});
-  const agents = agentsOf(studio.settings, { ...(chat ?? emptyChat), agents: own });
+  const own: Partial<Agents> = chat ? (chat.agents ?? {}) : (pendingAgents ?? {});
+  const agents = agentsOf(settings, { ...(chat ?? emptyChat), agents: own });
   const chooseAgent = (role: AgentRole, choice: AgentChoice | null) => {
     const next: Partial<Agents> = { ...own };
     if (choice) next[role] = choice;
@@ -577,7 +581,7 @@ function Composer({ chat }: { chat?: Chat }) {
     (editing
       ? text.trim().length >= 2
       : info.makeable &&
-        (ui.kind === 'template'
+        (kind === 'template'
           ? Boolean(template) && sampleLangs.length > 0
           : text.trim().length >= 3));
 
@@ -589,13 +593,13 @@ function Composer({ chat }: { chat?: Chat }) {
       const sent = await api.send({
         ...(chat ? { chatId: chat.id } : {}),
         text: text.trim(),
-        kind: ui.kind,
+        kind,
         ...(editing ? { refs } : {}),
-        ...(!editing && ui.kind === 'design' && count ? { count: Number(count) } : {}),
-        ...(!editing && ui.kind === 'template' ? { templateId, languages: sampleLangs } : {}),
+        ...(!editing && kind === 'design' && count ? { count: Number(count) } : {}),
+        ...(!editing && kind === 'template' ? { templateId, languages: sampleLangs } : {}),
       });
       if (!chat) {
-        const pending = ui.pendingAgents;
+        const pending = pendingAgents;
         setUi({ chatId: sent.id, pendingAgents: null });
         if (pending) await api.chatAgents(sent.id, pending);
       }
@@ -617,9 +621,9 @@ function Composer({ chat }: { chat?: Chat }) {
 
   const placeholder: MessageKey = editing
     ? 'chat.placeholderChange'
-    : ui.kind === 'template'
+    : kind === 'template'
       ? 'chat.placeholderTemplate'
-      : ui.kind === 'design'
+      : kind === 'design'
         ? 'chat.placeholderDesign'
         : 'chat.placeholderAuto';
 
@@ -629,11 +633,7 @@ function Composer({ chat }: { chat?: Chat }) {
         <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-ui-fg-muted">
           <span className="shrink-0">{t('chat.about')}</span>
           {refs.slice(0, 3).map((vid) => (
-            <OutputPill
-              key={vid}
-              variant={studio.variants[vid]!}
-              onRemove={() => toggleSelected(vid)}
-            />
+            <OutputPill key={vid} variant={variants[vid]!} onRemove={() => toggleSelected(vid)} />
           ))}
           {refs.length > 3 && (
             <span className="font-medium text-ui-accent-fg">
@@ -649,7 +649,7 @@ function Composer({ chat }: { chat?: Chat }) {
           </button>
         </div>
       ) : (
-        ui.kind !== 'auto' && (
+        kind !== 'auto' && (
           <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-ui-fg-muted">
             <span className="shrink-0">{t('chat.making')}</span>
             <span className="inline-flex h-6 items-center gap-1.5 rounded-full bg-ui-accent-soft ps-2 pe-1 font-medium text-ui-accent-fg">
@@ -676,7 +676,7 @@ function Composer({ chat }: { chat?: Chat }) {
           {t('chat.notMakeable', { kind: t(info.title) })}
         </div>
       )}
-      {!editing && info.makeable && ui.kind === 'design' && (
+      {!editing && info.makeable && kind === 'design' && (
         <div className="flex items-center gap-2 text-xs text-ui-fg-muted">
           <span>{t('chat.howMany')}</span>
           <Select
@@ -693,7 +693,7 @@ function Composer({ chat }: { chat?: Chat }) {
           <span className="min-w-0 flex-1 truncate">{t('chat.allLanguagesNote')}</span>
         </div>
       )}
-      {!editing && ui.kind === 'template' && (
+      {!editing && kind === 'template' && (
         <div className="flex min-w-0 items-center gap-1">
           <Select
             aria-label={t('chat.template')}
@@ -773,18 +773,19 @@ const emptyChat: Chat = { id: '', title: '', createdAt: 0, updatedAt: 0, message
 
 /** The chat, as the app's: its title bar and history, the messages, and the composer. */
 export function ChatPanel() {
-  const studio = useStudio();
-  const ui = useUi();
-  const chat = studio.chats.find((one) => one.id === ui.chatId);
+  const chats = useStudio((studio) => studio.chats);
+  const chatId = useUi((ui) => ui.chatId);
+  const kind = useUi((ui) => ui.kind);
+  const chat = chats.find((one) => one.id === chatId);
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <ChatHeader chat={chat} chats={studio.chats} />
+      <ChatHeader chat={chat} chats={chats} />
       <div className="min-h-0 flex-1 overflow-y-auto select-text">
         {chat && chat.messages.length > 0 ? (
           <Messages chat={chat} />
         ) : (
           <Empty
-            kind={ui.kind}
+            kind={kind}
             onSuggest={(draft) => setUi((now) => ({ draft, focusComposer: now.focusComposer + 1 }))}
           />
         )}

@@ -84,8 +84,9 @@ function Programs({ status }: { status?: ServerStatus }) {
   );
 }
 
-function TitleBar({ status, connected }: { status?: ServerStatus; connected: boolean }) {
+function TitleBar({ status }: { status?: ServerStatus }) {
   const t = useT();
+  const connected = useStudio((studio) => studio.connected);
   return (
     <header className="editor-header relative flex h-titlebar shrink-0 items-center gap-3 px-4">
       {/* The mark and the name are one Latin logo: the mark leads it in Hebrew too. */}
@@ -160,7 +161,8 @@ function RailButton({
 /** The Activity Bar of the app, as a list of what the studio makes: the next message's kind. */
 function Rail() {
   const t = useT();
-  const ui = useUi();
+  const panel = useUi((ui) => ui.panel);
+  const kind = useUi((ui) => ui.kind);
   return (
     <nav
       aria-label={t('rail.label')}
@@ -175,7 +177,7 @@ function Rail() {
             label={t(info.title)}
             caption={t(info.caption)}
             muted={!info.makeable}
-            active={ui.panel === 'chat' && ui.kind === info.kind}
+            active={panel === 'chat' && kind === info.kind}
             onClick={() => chooseKind(info.kind)}
           />
         ))}
@@ -187,7 +189,7 @@ function Rail() {
           icon={SettingsIcon}
           label={t('settings.title')}
           caption={t('rail.settings')}
-          active={ui.panel === 'settings'}
+          active={panel === 'settings'}
           onClick={toggleSettings}
         />
       </div>
@@ -290,17 +292,18 @@ export function PanelHeader({ title, children }: { title: string; children?: Rea
 }
 
 function MiddlePanel({ status, onStatus }: { status?: ServerStatus; onStatus: () => void }) {
-  const ui = useUi();
+  const panel = useUi((ui) => ui.panel);
+  const panelShare = useUi((ui) => ui.panelShare);
   const t = useT();
   const windowWidth = useWindowWidth();
   const [dragging, setDragging] = useState(false);
   const max = Math.floor(windowWidth * MAX_SHARE);
-  const wanted = ui.panelShare === null ? defaultWidth(windowWidth) : ui.panelShare * windowWidth;
+  const wanted = panelShare === null ? defaultWidth(windowWidth) : panelShare * windowWidth;
   const width = Math.round(Math.min(Math.max(wanted, MIN_WIDTH), max));
   return (
     <>
       <aside
-        data-panel={ui.panel}
+        data-panel={panel}
         style={{ '--panel-width': `${width}px` } as CSSProperties}
         className={cx(
           'relative w-(--panel-width) shrink-0 overflow-hidden border-e border-ui-line bg-ui-panel',
@@ -308,7 +311,7 @@ function MiddlePanel({ status, onStatus }: { status?: ServerStatus; onStatus: ()
         )}
       >
         <div className="flex h-full w-(--panel-width) flex-col">
-          {ui.panel === 'settings' ? (
+          {panel === 'settings' ? (
             <>
               <PanelHeader title={t('settings.title')}>
                 <IconButton
@@ -337,11 +340,12 @@ function MiddlePanel({ status, onStatus }: { status?: ServerStatus; onStatus: ()
 
 function StatusBar() {
   const t = useT();
-  const studio = useStudio();
-  const variants = Object.values(studio.variants).filter((variant) => !variant.discarded);
+  const all = useStudio((studio) => studio.variants);
+  const requests = useStudio((studio) => studio.requests);
+  const connected = useStudio((studio) => studio.connected);
+  const variants = Object.values(all).filter((variant) => !variant.discarded);
   const running =
-    variants.filter(isRunning).length +
-    studio.requests.filter((r) => r.status === 'planning').length;
+    variants.filter(isRunning).length + requests.filter((r) => r.status === 'planning').length;
   const waiting = variants.filter(awaitsApproval).length;
   const published = variants.filter(isPublished).length;
   const item = (dot: string, text: string) => (
@@ -359,21 +363,71 @@ function StatusBar() {
       )}
       {item('bg-ui-success-fg', t('shell.published', { count: published }))}
       <span className="flex-1" />
-      {!studio.connected && <span className="text-ui-danger-fg">{t('shell.disconnected')}</span>}
+      {!connected && <span className="text-ui-danger-fg">{t('shell.disconnected')}</span>}
     </footer>
   );
 }
 
 /* ---------------------------------------------------------------- the studio */
 
+/** Opens what Slidr Library asks for, and a new chat in place of one another window deleted. */
+function Follow() {
+  const requests = useStudio((studio) => studio.requests);
+  const chats = useStudio((studio) => studio.chats);
+  const loaded = useStudio((studio) => studio.loaded);
+  const chatId = useUi((ui) => ui.chatId);
+  const detail = useUi((ui) => ui.detail);
+
+  // Slidr Library opens a request and a variant here: the chat it was asked in, and the variant.
+  const openRequest = useCallback(
+    (rid: string | null | undefined, vid: string | null | undefined) => {
+      const request = rid ? requests.find((one) => one.id === rid) : undefined;
+      if (request?.chatId) openChat(request.chatId);
+      if (vid) setUi({ detail: vid });
+    },
+    [requests],
+  );
+  useEffect(() => onOpen((open) => openRequest(open.tab, open.v)), [openRequest]);
+  // Once, as the studio opens on an address of Slidr Library's (`#tab=<rid>&v=<vid>`).
+  const tabDone = useRef(!requestedTab);
+  useEffect(() => {
+    if (tabDone.current || !loaded) return;
+    tabDone.current = true;
+    openRequest(requestedTab, detail);
+  }, [loaded, openRequest, detail]);
+
+  // A chat another window deleted: a new one in its place.
+  useEffect(() => {
+    if (loaded && chatId && !chats.some((chat) => chat.id === chatId)) {
+      openChat(null);
+    }
+  }, [loaded, chats, chatId]);
+
+  return null;
+}
+
+/** The output open up close. */
+function Detail() {
+  const id = useUi((ui) => ui.detail);
+  const detail = useStudio((studio) => (id ? studio.variants[id] : undefined));
+  if (!detail) return null;
+  const close = () => setUi({ detail: null });
+  return isTemplate(detail) ? (
+    <TemplateVariantDetail key={detail.id} variant={detail} onClose={close} />
+  ) : (
+    <VariantDetail key={detail.id} variant={detail} onClose={close} />
+  );
+}
+
 /**
  * The studio, laid out as the app is: the rail of what it makes, the chat that asks for it (or
  * the settings), and the outputs, which the person selects, asks to change in the chat, and
  * approves.
+ *
+ * It reads neither store itself: what it drew again would draw everything again, at every key
+ * of the composer and every line of a working variant's log. Each part reads its own.
  */
 export function Studio() {
-  const studio = useStudio();
-  const ui = useUi();
   const [lang] = useLang();
   const [status, setStatus] = useState<ServerStatus>();
 
@@ -382,38 +436,10 @@ export function Studio() {
   }, []);
   useEffect(refreshStatus, [refreshStatus]);
 
-  // Slidr Library opens a request and a variant here: the chat it was asked in, and the variant.
-  const openRequest = useCallback(
-    (rid: string | null | undefined, vid: string | null | undefined) => {
-      const request = rid ? studio.requests.find((one) => one.id === rid) : undefined;
-      if (request?.chatId) openChat(request.chatId);
-      if (vid) setUi({ detail: vid });
-    },
-    [studio.requests],
-  );
-  useEffect(() => onOpen((open) => openRequest(open.tab, open.v)), [openRequest]);
-  // Once, as the studio opens on an address of Slidr Library's (`#tab=<rid>&v=<vid>`).
-  const tabDone = useRef(!requestedTab);
-  useEffect(() => {
-    if (tabDone.current || !studio.loaded) return;
-    tabDone.current = true;
-    openRequest(requestedTab, ui.detail);
-  }, [studio.loaded, openRequest, ui.detail]);
-
-  // A chat another window deleted: a new one in its place.
-  useEffect(() => {
-    if (studio.loaded && ui.chatId && !studio.chats.some((chat) => chat.id === ui.chatId)) {
-      openChat(null);
-    }
-  }, [studio.loaded, studio.chats, ui.chatId]);
-
-  const detail = ui.detail ? studio.variants[ui.detail] : undefined;
-  const close = () => setUi({ detail: null });
-
   return (
     <UiProvider dir={languageDir(lang)}>
       <div className="flex h-full flex-col bg-ui-chrome text-ui-fg">
-        <TitleBar status={status} connected={studio.connected} />
+        <TitleBar status={status} />
         <div className="flex min-h-0 flex-1">
           <Rail />
           <MiddlePanel status={status} onStatus={refreshStatus} />
@@ -421,12 +447,8 @@ export function Studio() {
         </div>
         <StatusBar />
       </div>
-      {detail &&
-        (isTemplate(detail) ? (
-          <TemplateVariantDetail key={detail.id} variant={detail} onClose={close} />
-        ) : (
-          <VariantDetail key={detail.id} variant={detail} onClose={close} />
-        ))}
+      <Follow />
+      <Detail />
     </UiProvider>
   );
 }

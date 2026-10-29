@@ -16,28 +16,33 @@ import { setUi, useUi, type Scope } from './ui';
 export function DisplayPanel() {
   const t = useT();
   const [uiLang] = useLang();
-  const studio = useStudio();
-  const ui = useUi();
+  const requests = useStudio((studio) => studio.requests);
+  const variants = useStudio((studio) => studio.variants);
+  const displayLang = useUi((ui) => ui.displayLang);
+  const scope = useUi((ui) => ui.scope);
+  const chatId = useUi((ui) => ui.chatId);
+  const selected = useUi((ui) => ui.selected);
+  const highlight = useUi((ui) => ui.highlight);
   const approve = useApprove();
-  const lang: Lang = ui.displayLang ?? uiLang;
+  const lang: Lang = displayLang ?? uiLang;
   const [showDiscarded, setShowDiscarded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [refused, setRefused] = useState<{ variantId: string; error?: string }[]>([]);
 
   const inScope = useMemo(() => {
-    const requests =
-      ui.scope === 'all'
-        ? studio.requests
-        : studio.requests.filter((request) => ui.chatId && request.chatId === ui.chatId);
-    return requests.flatMap((request) =>
-      request.variantIds.flatMap((vid) => (studio.variants[vid] ? [studio.variants[vid]] : [])),
+    const shown =
+      scope === 'all'
+        ? requests
+        : requests.filter((request) => chatId && request.chatId === chatId);
+    return shown.flatMap((request) =>
+      request.variantIds.flatMap((vid) => (variants[vid] ? [variants[vid]] : [])),
     );
-  }, [studio.requests, studio.variants, ui.scope, ui.chatId]);
+  }, [requests, variants, scope, chatId]);
   const discarded = inScope.filter((variant) => variant.discarded).length;
   const listed = showDiscarded ? inScope : inScope.filter((variant) => !variant.discarded);
   const waiting = listed.filter(awaitsApproval);
-  const chosen = ui.selected
-    .map((vid) => studio.variants[vid])
+  const chosen = selected
+    .map((vid) => variants[vid])
     .filter((variant): variant is Variant => variant !== undefined && awaitsApproval(variant));
 
   const approveChosen = () => {
@@ -47,7 +52,7 @@ export function DisplayPanel() {
       .then(
         (failed) => {
           setRefused(failed);
-          setUi({ selected: ui.selected.filter((vid) => failed.some((f) => f.variantId === vid)) });
+          setUi({ selected: selected.filter((vid) => failed.some((f) => f.variantId === vid)) });
         },
         (failure: unknown) =>
           setRefused([
@@ -65,7 +70,7 @@ export function DisplayPanel() {
         <SegmentedControl<Scope>
           aria-label={t('display.scope')}
           size="sm"
-          value={ui.scope}
+          value={scope}
           onValueChange={(scope) => setUi({ scope })}
           options={[
             { value: 'chat', label: t('display.scopeChat') },
@@ -94,7 +99,7 @@ export function DisplayPanel() {
             {t('display.selectWaiting', { count: waiting.length })}
           </Button>
         )}
-        {ui.selected.length > 0 && (
+        {selected.length > 0 && (
           <Button size="sm" variant="ghost" icon={X} onClick={() => setUi({ selected: [] })}>
             {t('display.clearSelection')}
           </Button>
@@ -120,9 +125,7 @@ export function DisplayPanel() {
           <ul className="min-w-0 flex-1">
             {refused.map((item, i) => (
               <li key={i} dir="auto">
-                {studio.variants[item.variantId]
-                  ? `${outputName(studio.variants[item.variantId]!, lang)}: `
-                  : ''}
+                {variants[item.variantId] ? `${outputName(variants[item.variantId]!, lang)}: ` : ''}
                 {item.error}
               </li>
             ))}
@@ -144,7 +147,7 @@ export function DisplayPanel() {
             icon={GalleryVerticalEnd}
             title={t('display.emptyTitle')}
             description={
-              ui.scope === 'chat' && inScope.length === 0 && studio.requests.length > 0
+              scope === 'chat' && inScope.length === 0 && requests.length > 0
                 ? t('display.emptyChat')
                 : t('display.emptyAbout')
             }
@@ -156,8 +159,8 @@ export function DisplayPanel() {
                 key={variant.id}
                 variant={variant}
                 lang={lang}
-                selected={ui.selected.includes(variant.id)}
-                highlighted={ui.highlight.includes(variant.id)}
+                selected={selected.includes(variant.id)}
+                highlighted={highlight.includes(variant.id)}
               />
             ))}
           </div>

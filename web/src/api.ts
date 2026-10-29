@@ -348,10 +348,14 @@ async function load() {
   );
 }
 
+/** Entries a variant's log keeps, as the store does (`LOG_LIMIT`, src-tauri/src/store.rs). */
+const LOG_LIMIT = 400;
+
 type StudioEvent =
   | { type: 'request'; request: StudioRequest }
   | { type: 'requestDeleted'; id: string }
   | { type: 'variant'; variant: Variant }
+  | { type: 'variantLog'; id: string; entry: LogEntry; updatedAt: number }
   | { type: 'chat'; chat: Chat }
   | { type: 'chatDeleted'; id: string }
   | { type: 'settings'; settings: StudioSettings };
@@ -396,6 +400,19 @@ function receive(event: StudioEvent) {
     case 'variant':
       set({ variants: { ...state.variants, [event.variant.id]: event.variant } });
       break;
+    case 'variantLog': {
+      // A line of a working variant's log comes alone: the variant whole carries all of it.
+      const variant = state.variants[event.id];
+      if (!variant) break;
+      const log = [...variant.log, event.entry].slice(-LOG_LIMIT);
+      set({
+        variants: {
+          ...state.variants,
+          [event.id]: { ...variant, log, updatedAt: event.updatedAt },
+        },
+      });
+      break;
+    }
     case 'chat': {
       const others = state.chats.filter((chat) => chat.id !== event.chat.id);
       set({ chats: byCreation([...others, event.chat]) });
@@ -410,15 +427,21 @@ function receive(event: StudioEvent) {
   }
 }
 
-export function useStudio(): State {
-  return useSyncExternalStore(
-    (listener) => {
-      listeners.add(listener);
-      connect();
-      return () => listeners.delete(listener);
-    },
-    () => state,
-  );
+const subscribe = (listener: () => void) => {
+  listeners.add(listener);
+  connect();
+  return () => listeners.delete(listener);
+};
+
+/**
+ * The studio's state, or the part of it `select` picks: a component is drawn again only when that
+ * part changes. A working variant changes with every line of its log, a few times a second.
+ * `select` must answer a value of the state as it is, not a new object (see `useUi`).
+ */
+export function useStudio(): State;
+export function useStudio<T>(select: (state: State) => T): T;
+export function useStudio<T>(select?: (state: State) => T): T | State {
+  return useSyncExternalStore(subscribe, () => (select ? select(state) : state));
 }
 
 /* ---------------------------------------------------------------- calls */
