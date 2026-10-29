@@ -141,6 +141,7 @@ const words: Partial<Record<MessageKey, string>> = {
   'display.stateAwaitingPublish': 'onay ve yayın bekliyor',
   'display.stateFailsContract': 'sözleşmeye uymuyor',
   'display.statePublishing': 'yayımlanıyor',
+  'display.stateWaitsInLibrary': 'kütüphanede bekliyor',
   'display.statePublished': 'yayımlandı',
   'display.stateChanged': 'yayımlandıktan sonra değişti',
   'display.statePublishFailed': 'yayımlanamadı',

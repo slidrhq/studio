@@ -47,6 +47,7 @@ export const STATE_LABEL: Record<OutputState, MessageKey> = {
   awaitingPublish: 'display.stateAwaitingPublish',
   failsContract: 'display.stateFailsContract',
   publishing: 'display.statePublishing',
+  waitsInLibrary: 'display.stateWaitsInLibrary',
   published: 'display.statePublished',
   changedSincePublished: 'display.stateChanged',
   publishFailed: 'display.statePublishFailed',
@@ -95,6 +96,7 @@ export function outputName(variant: Variant, lang: Lang): string {
 const TONE: Partial<Record<OutputState, string>> = {
   awaitingMaster: 'bg-ui-tool-orange text-ui-tool-orange-fg',
   awaitingPublish: 'bg-ui-tool-blue text-ui-tool-blue-fg',
+  waitsInLibrary: 'bg-ui-tool-blue text-ui-tool-blue-fg',
   published: 'bg-ui-tool-green text-ui-tool-green-fg',
   changedSincePublished: 'bg-ui-tool-orange text-ui-tool-orange-fg',
   failsContract: 'bg-ui-danger-soft text-ui-danger-fg',
@@ -103,7 +105,10 @@ const TONE: Partial<Record<OutputState, string>> = {
   cancelled: 'bg-ui-field text-ui-fg-muted',
 };
 
-/** Where an output stands: a spinner and what it does, or a tinted pill. */
+/**
+ * Where an output stands: a spinner and what it does, or a tinted pill; of one that waits in the
+ * library, the pill says why on hover.
+ */
 export function StateLine({ variant }: { variant: Variant }) {
   const t = useT();
   const state = stateOf(variant);
@@ -125,6 +130,7 @@ export function StateLine({ variant }: { variant: Variant }) {
         'inline-flex h-5 max-w-full shrink-0 items-center gap-1.5 rounded-full px-2 text-xs font-medium whitespace-nowrap',
         TONE[state] ?? 'bg-ui-field text-ui-fg-muted',
       )}
+      title={state === 'waitsInLibrary' ? variant.upload?.note : undefined}
     >
       <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-current" />
       <span className="truncate">{t(STATE_LABEL[state])}</span>

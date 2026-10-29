@@ -117,6 +117,11 @@ export interface Item {
   exempt?: boolean;
   /** Drawn through a scale nested in the source: its pixels carry raster noise (ADR-005). */
   scaled: boolean;
+  /**
+   * A picture the browser draws at a size other than its own, or turned: its pixels are
+   * resampled, by a filter the browser picks for itself.
+   */
+  resampled?: boolean;
   /** Content items the element stands for, and their characters (editability). */
   units: number;
   chars: number;
@@ -771,8 +776,16 @@ export function propose(root: Element, options: WalkOptions): Proposal {
     const loaded = el.naturalWidth > 0 && !el.hasAttribute(BLANK_IMAGE_ATTRIBUTE);
     const fit = cs.objectFit === 'cover' || cs.objectFit === 'contain' ? cs.objectFit : 'fill';
     if (loaded && cs.objectFit !== fit) return undefined;
-    const rect = snapRect(contentRect(el, cs, vl), Math.abs(vl - 1) > 1e-6);
+    const content = contentRect(el, cs, vl);
+    const rect = snapRect(content, Math.abs(vl - 1) > 1e-6);
     const box = { w: rect.width / vl, h: rect.height / vl };
+    // Screen px per pixel of the picture, across and down, as the fit draws it.
+    const sx = content.width / el.naturalWidth;
+    const sy = content.height / el.naturalHeight;
+    const both = fit === 'cover' ? Math.max(sx, sy) : fit === 'contain' ? Math.min(sx, sy) : 0;
+    const resampled =
+      loaded &&
+      (!!effects.rotation || [both || sx, both || sy].some((scale) => Math.abs(scale - 1) > 1e-6));
     const css: Record<string, string> = { ...effects.css };
 
     // Where the picture sits in its box, when not in the middle: a crop of the original.
@@ -874,6 +887,7 @@ export function propose(root: Element, options: WalkOptions): Proposal {
       state,
       {
         exempt,
+        resampled,
       },
     );
   };

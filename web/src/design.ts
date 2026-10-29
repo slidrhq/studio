@@ -274,6 +274,20 @@ export function contractIssues(slide: SlideModel, conversion: HtmlSlideConversio
   if (!parsed.success) {
     issues.push(`The slide is not valid: ${parsed.error.issues[0]?.message ?? 'unknown'}.`);
   }
+  // The engine kept all of the slide as written: the checks below would find nothing on it, and
+  // their four findings would send the agent after the picture, the text and the copy.
+  const [only] = slide.elements;
+  if (
+    slide.elements.length === 1 &&
+    only?.type === 'html' &&
+    only.frame.w >= 1920 &&
+    only.frame.h >= 1080
+  ) {
+    issues.push(
+      'The whole slide stayed one html element: the engine could not match one part of it and kept all of it as written, so the slide has no picture, text or shape of its own. The conversion notes say which part and why ("image that looks different" is the <img>). Change that part; the slide is converted again, and the rest of the contract is checked then.',
+    );
+    return issues;
+  }
   const pictures = new Set<string>();
   for (const element of walkElements(slide.elements)) {
     if (element.type !== 'image') continue;

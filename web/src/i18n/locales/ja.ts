@@ -142,6 +142,7 @@ const words: Partial<Record<MessageKey, string>> = {
   'display.stateAwaitingPublish': '承認・公開待ち',
   'display.stateFailsContract': '規約違反',
   'display.statePublishing': '公開中',
+  'display.stateWaitsInLibrary': 'ライブラリで待機中',
   'display.statePublished': '公開済み',
   'display.stateChanged': '公開後に変更あり',
   'display.statePublishFailed': '公開に失敗',

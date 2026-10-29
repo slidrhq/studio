@@ -1078,6 +1078,18 @@ export async function startConversion(root: Element, options: ConvertOptions): P
     const dense = clusters(strict.all, strict.width, CLUSTER_CELL, strict.owner).filter(
       (c) => c.pixels >= CLUSTER_MIN_PIXELS,
     );
+    // A picture drawn at a size other than its own is resampled, and the browser picks how: a
+    // level of its mipmap or the full picture, one filter or another, a quarter pixel snapped or
+    // not, by what its caches hold at the moment. Two pictures of one page can come out either
+    // way: in a render window of the studio, a photo of sequins drawn at half its size differed
+    // from itself in 935 of 98230 pixels in most conversions and in none in a few. Drawn every
+    // way a canvas can, it differs in up to 6% of its pixels by the strict threshold, and in
+    // no more than 39 by the noise threshold. So it is judged by the noise threshold.
+    const resampled = items.some((item) => item.resampled)
+      ? clusters(fine.all, fine.width, CLUSTER_CELL, fine.owner).filter(
+          (c) => c.pixels >= CLUSTER_MIN_PIXELS,
+        )
+      : [];
 
     // A box that is wrong all over (one that lost its background) changes every pixel of
     // whatever is drawn on it. What lies on such a box is not judged in this round: the box is
@@ -1131,9 +1143,12 @@ export async function startConversion(root: Element, options: ConvertOptions): P
         const text = textual(item);
         const least = text ? 2 * BAD_MIN_PIXELS : BAD_MIN_PIXELS;
         const share = text ? BAD_TEXT_SHARE : BAD_SHARE;
-        const local = text ? undefined : dense.find((c) => c.owner === index);
-        const differing = strict.differing[index]!;
-        const owned = strict.owned[index]!;
+        const counted = item.resampled ? fine : strict;
+        const local = text
+          ? undefined
+          : (item.resampled ? resampled : dense).find((c) => c.owner === index);
+        const differing = counted.differing[index]!;
+        const owned = counted.owned[index]!;
         const glyphShift =
           text &&
           differing <= GLYPH_SHIFT_SHARE * owned &&

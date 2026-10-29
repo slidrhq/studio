@@ -137,6 +137,7 @@ const words: Partial<Record<MessageKey, string>> = {
   'display.stateAwaitingPublish': '等待批准并发布',
   'display.stateFailsContract': '不符合规范',
   'display.statePublishing': '发布中',
+  'display.stateWaitsInLibrary': '在媒体库中等待',
   'display.statePublished': '已发布',
   'display.stateChanged': '发布后有改动',
   'display.statePublishFailed': '发布失败',

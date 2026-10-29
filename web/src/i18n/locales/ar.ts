@@ -139,6 +139,7 @@ const words: Partial<Record<MessageKey, string>> = {
   'display.stateAwaitingPublish': 'جاهز للاعتماد والنشر',
   'display.stateFailsContract': 'لا يستوفي شروطه',
   'display.statePublishing': 'قيد النشر',
+  'display.stateWaitsInLibrary': 'ينتظر في المكتبة',
   'display.statePublished': 'منشور',
   'display.stateChanged': 'تغيّر منذ النشر',
   'display.statePublishFailed': 'فشل النشر',

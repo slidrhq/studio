@@ -141,6 +141,7 @@ const words: Partial<Record<MessageKey, string>> = {
   'display.stateAwaitingPublish': 'chờ duyệt và xuất bản',
   'display.stateFailsContract': 'không đạt quy chuẩn',
   'display.statePublishing': 'đang xuất bản',
+  'display.stateWaitsInLibrary': 'đang chờ trong thư viện',
   'display.statePublished': 'đã xuất bản',
   'display.stateChanged': 'đã đổi sau khi xuất bản',
   'display.statePublishFailed': 'xuất bản thất bại',

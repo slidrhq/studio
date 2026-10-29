@@ -177,6 +177,7 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
         Arc::clone(&store),
         Arc::clone(&templates),
     ));
+    library.watch();
     let renders = Arc::new(Renders::new(app.clone(), settings.show_render));
     let prefs = Arc::new(Preferences::load(agents::settings_file(&settings.data)));
     let studio = Arc::new(Studio::new(

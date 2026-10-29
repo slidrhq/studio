@@ -141,6 +141,7 @@ const words: Partial<Record<MessageKey, string>> = {
   'display.stateAwaitingPublish': 'siap disetujui & diterbitkan',
   'display.stateFailsContract': 'tidak memenuhi kontrak',
   'display.statePublishing': 'sedang diterbitkan',
+  'display.stateWaitsInLibrary': 'menunggu di pustaka',
   'display.statePublished': 'diterbitkan',
   'display.stateChanged': 'berubah sejak diterbitkan',
   'display.statePublishFailed': 'gagal diterbitkan',

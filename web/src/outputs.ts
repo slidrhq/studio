@@ -1,7 +1,8 @@
 /**
  * Where an output stands, as the cards, the chat and the status bar say it: being made, waiting
- * for the person's approval (of its English master, or of the whole to publish it), published,
- * or stopped. An output is a variant: a design concept, or a template's sample in one language.
+ * for the person's approval (of its English master, or of the whole to publish it), waiting in the
+ * library, published, or stopped. An output is a variant: a design concept, or a template's sample
+ * in one language.
  */
 import { CONTENT_LANGUAGES } from '@slidr/model';
 import { isRunning, isTemplate, type Lang, type Phase, type Variant } from './api';
@@ -13,6 +14,14 @@ export const phaseOf = (variant: Variant): Phase =>
 /** Published as it is now: no change since it went to the library. */
 export const isPublished = (variant: Variant) =>
   Boolean(variant.published && variant.published.revision === variant.revision);
+
+/**
+ * Sent, and kept by the library: accepted, for its own job to publish once a publication can run,
+ * or pending, for a person there. The studio asks after it; approving it again is not next.
+ */
+export const waitsInLibrary = (variant: Variant) =>
+  !isPublished(variant) &&
+  (variant.upload?.status === 'accepted' || variant.upload?.status === 'pending');
 
 /**
  * What approving it does: its English master goes to be translated, or the whole is published. A
@@ -31,7 +40,8 @@ export const awaitsApproval = (variant: Variant) =>
   variant.status === 'ready' &&
   !variant.discarded &&
   Boolean(variant.render?.publishable) &&
-  !isPublished(variant);
+  !isPublished(variant) &&
+  !waitsInLibrary(variant);
 
 export type OutputState =
   | 'working'
@@ -39,6 +49,7 @@ export type OutputState =
   | 'awaitingPublish'
   | 'failsContract'
   | 'publishing'
+  | 'waitsInLibrary'
   | 'published'
   | 'changedSincePublished'
   | 'publishFailed'
@@ -51,6 +62,7 @@ export function stateOf(variant: Variant): OutputState {
   if (variant.status === 'failed') return 'failed';
   if (variant.status === 'cancelled') return 'cancelled';
   if (isPublished(variant)) return 'published';
+  if (waitsInLibrary(variant)) return 'waitsInLibrary';
   if (variant.publishError) return 'publishFailed';
   if (!variant.render?.publishable) return 'failsContract';
   if (phaseOf(variant) === 'master') return 'awaitingMaster';

@@ -143,6 +143,7 @@ const words: Partial<Record<MessageKey, string>> = {
   'display.stateAwaitingPublish': 'da approvare e pubblicare',
   'display.stateFailsContract': 'non rispetta il contratto',
   'display.statePublishing': 'in pubblicazione',
+  'display.stateWaitsInLibrary': 'in attesa nella libreria',
   'display.statePublished': 'pubblicato',
   'display.stateChanged': 'modificato dopo la pubblicazione',
   'display.statePublishFailed': 'pubblicazione non riuscita',

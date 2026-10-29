@@ -261,6 +261,7 @@ const COUNTED: OutputState[] = [
   'awaitingMaster',
   'awaitingPublish',
   'publishing',
+  'waitsInLibrary',
   'published',
   'changedSincePublished',
   'failsContract',

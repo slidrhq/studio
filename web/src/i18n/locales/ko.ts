@@ -141,6 +141,7 @@ const words: Partial<Record<MessageKey, string>> = {
   'display.stateAwaitingPublish': '승인 및 게시 대기 중',
   'display.stateFailsContract': '규약 미충족',
   'display.statePublishing': '게시 중',
+  'display.stateWaitsInLibrary': '라이브러리에서 대기 중',
   'display.statePublished': '게시됨',
   'display.stateChanged': '게시 후 변경됨',
   'display.statePublishFailed': '게시 실패',

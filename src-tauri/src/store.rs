@@ -434,6 +434,17 @@ pub struct Upload {
     pub id: String,
     pub status: Option<String>,
     pub at: f64,
+    /// Why it waits in the library, as the library said when last asked.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+impl Upload {
+    /// Whether it waits in the library: accepted, to be published by the library's own job once a
+    /// publication can run, or pending, for a person there to look at it.
+    pub fn waits(&self) -> bool {
+        matches!(self.status.as_deref(), Some("accepted" | "pending"))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

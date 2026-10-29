@@ -10,8 +10,8 @@
 //! `templates: translate`. The
 //! library checks each against what it publishes. Sent with a token that publishes, an upload is
 //! published at once, or waits in the library and says why: publishing is the library's business,
-//! and the studio only keeps each upload's status, and marks the variants whose uploads were
-//! published.
+//! and the studio only keeps each upload's status, asks again after those that wait (`watch`),
+//! and marks the variants whose uploads were published.
 
 use std::{
     collections::BTreeMap,
@@ -48,6 +48,8 @@ pub const MANAGED: &str = "elements/designs/managed.json";
 pub const GALLERY: (u32, u32) = (320, 180);
 /// How good a picture made ahead is, of a hundred: as the app made the pictures of its designs.
 pub const GALLERY_QUALITY: f32 = 85.0;
+/// How often the studio asks the library after the uploads that wait there.
+const WAITING_EVERY: Duration = Duration::from_secs(60);
 
 /// The picture as the library keeps it: lossy WebP at the quality the studio has always used, with
 /// its alpha when it has one; and its size.
@@ -461,9 +463,10 @@ impl Library {
         }
     }
 
-    /// What the library answered of an upload, kept by its variant: its status, and when it was
-    /// published, the variant is marked published and leaves the queue. The item says the upload,
-    /// its status, and why it waits, when it does.
+    /// What the library answered of an upload, kept by its variant: its status and why it waits,
+    /// and when it was published, the variant is marked published and leaves the queue. An upload
+    /// that waits in the library, or was published, is no failure of its variant's; one the library
+    /// rejected is. The item says the upload, its status, and why it waits, when it does.
     fn settle(&self, vid: &str, answer: &Value) -> Value {
         let id = answer
             .get("id")
@@ -475,12 +478,21 @@ impl Library {
             .and_then(Value::as_str)
             .map(str::to_owned);
         let published = status.as_deref() == Some("published");
+        let note = why_it_waits(answer);
         self.store.update_variant(vid, |variant| {
-            variant.upload = Some(Upload {
+            let upload = Upload {
                 id: id.clone(),
                 status: status.clone(),
                 at: now(),
-            });
+                note: note.map(str::to_owned),
+            };
+            if published || upload.waits() {
+                variant.publish_error = None;
+            } else if status.as_deref() == Some("rejected") {
+                let why = format!("The library rejected it. {}", note.unwrap_or_default());
+                variant.publish_error = Some(why.trim().to_owned());
+            }
+            variant.upload = Some(upload);
             if published
                 && variant
                     .published
@@ -498,7 +510,6 @@ impl Library {
         if published {
             *lock(&self.known) = None;
         }
-        let note = why_it_waits(answer);
         json!({
             "variantId": vid,
             "uploadId": id,
@@ -589,6 +600,32 @@ impl Library {
             self.templates.forget().await;
         }
         results
+    }
+
+    /// The variants whose uploads wait in the library.
+    fn waiting(&self) -> Vec<String> {
+        self.store
+            .variants()
+            .into_iter()
+            .filter(|variant| variant.upload.as_ref().is_some_and(Upload::waits))
+            .map(|variant| variant.id)
+            .collect()
+    }
+
+    /// Asks the library after the uploads that wait there, as the studio starts and then once a
+    /// minute: one the library publishes later (its own job does, once a publication can run) is
+    /// marked published, and one it sends back says why.
+    pub fn watch(self: &Arc<Self>) {
+        let library = Arc::clone(self);
+        tauri::async_runtime::spawn(async move {
+            loop {
+                let waiting = library.waiting();
+                if !waiting.is_empty() {
+                    library.statuses(&waiting).await;
+                }
+                tokio::time::sleep(WAITING_EVERY).await;
+            }
+        });
     }
 }
 
@@ -743,45 +780,64 @@ mod tests {
                 json!({"id": "u-2", "status": "accepted",
                        "publication": {"message": "The store could not be reached.", "attempts": 1}}),
             ),
+            (
+                "GET",
+                "/api/uploads/u-3",
+                200,
+                json!({"id": "u-3", "status": "rejected", "note": "Too close to m-harbour."}),
+            ),
         ]);
         let (library, store) = library(dir.path(), pages);
         let request = store.create_request(Request::draft(RequestKind::Design, "x".into()));
         let sent_upload = |id: &str| Upload {
             id: id.into(),
-            status: Some("pending".into()),
+            status: Some("accepted".into()),
             at: 1.0,
+            note: None,
         };
-        let sent = store
-            .create_variant(&request.id, design_brief(), NewVariant::default())
-            .expect("a variant");
-        store.update_variant(&sent.id, |v| {
-            v.approved = true;
-            v.upload = Some(sent_upload("u-1"));
-        });
-        let other = store
-            .create_variant(&request.id, design_brief(), NewVariant::default())
-            .expect("a variant");
-        store.update_variant(&other.id, |v| {
-            v.approved = true;
-            v.upload = Some(sent_upload("u-2"));
-        });
-        let items = library.statuses(&[sent.id.clone(), other.id.clone()]).await;
+        // Each was sent while a publication could not run, which the studio once kept as a failure.
+        let sent_as = |id: &str| {
+            let variant = store
+                .create_variant(&request.id, design_brief(), NewVariant::default())
+                .expect("a variant");
+            store.update_variant(&variant.id, |v| {
+                v.approved = true;
+                v.upload = Some(sent_upload(id));
+                v.publish_error = Some("It waits in the library (accepted).".into());
+            });
+            variant.id
+        };
+        let (sent, other, refused) = (sent_as("u-1"), sent_as("u-2"), sent_as("u-3"));
+        assert_eq!(library.waiting().len(), 3);
+        let items = library
+            .statuses(&[sent.clone(), other.clone(), refused.clone()])
+            .await;
         assert_eq!(items[0]["status"], "published");
         assert_eq!(items[1]["status"], "accepted");
         assert_eq!(items[1]["note"], "The store could not be reached.");
-        // Published, it leaves the queue; the other waits in the library, as it said.
-        let sent = store.variant(&sent.id).expect("the variant");
-        assert!(sent.published.is_some() && !sent.approved);
+        // Published, it leaves the queue; the other waits in the library, as it said, and neither
+        // failed; the one the library rejected did.
+        let sent = store.variant(&sent).expect("the variant");
+        assert!(sent.published.is_some() && !sent.approved && sent.publish_error.is_none());
         assert_eq!(
             sent.upload.and_then(|u| u.status).as_deref(),
             Some("published")
         );
-        let other = store.variant(&other.id).expect("the variant");
-        assert!(other.approved && other.published.is_none());
+        let other = store.variant(&other).expect("the variant");
+        assert!(other.approved && other.published.is_none() && other.publish_error.is_none());
+        let upload = other.upload.expect("its upload");
+        assert_eq!(upload.status.as_deref(), Some("accepted"));
         assert_eq!(
-            other.upload.and_then(|u| u.status).as_deref(),
-            Some("accepted")
+            upload.note.as_deref(),
+            Some("The store could not be reached.")
         );
+        let refused = store.variant(&refused).expect("the variant");
+        assert_eq!(
+            refused.publish_error.as_deref(),
+            Some("The library rejected it. Too close to m-harbour.")
+        );
+        // Only the one still waiting is asked after again.
+        assert_eq!(library.waiting(), [other.id]);
     }
 
     #[tokio::test]
@@ -836,6 +892,7 @@ mod tests {
                 id: "u-1".into(),
                 status: None,
                 at: 1.0,
+                note: None,
             });
         });
         let items = library.statuses(&[variant.id]).await;

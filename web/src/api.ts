@@ -210,7 +210,8 @@ export interface Variant {
   discarded?: boolean;
   published: { at: number; revision: number } | null;
   /** The upload it was sent to the library as, when it was. */
-  upload?: { id: string; status?: string; at: number };
+  /** The upload it was sent as: its status in the library, and why it waits there. */
+  upload?: { id: string; status?: string; at: number; note?: string };
   /** Why the last publication failed. */
   publishError?: string | null;
   cost: number;

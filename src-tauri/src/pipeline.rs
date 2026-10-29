@@ -1945,7 +1945,9 @@ impl Studio {
     }
 
     /// Sends an approved variant to the library, one publication at a time. A failure is kept on
-    /// the variant (`publishError`), which stays as it was made.
+    /// the variant (`publishError`), which stays as it was made; an upload the library keeps, to
+    /// publish later or for a person there to look at, is none: the studio asks after it
+    /// (`Library::watch`).
     async fn publish_steps(&self, vid: &str) -> Result<(), String> {
         let _slot = self
             .publish_slots
@@ -1961,6 +1963,8 @@ impl Studio {
             .next()
             .unwrap_or(Value::Null);
         let status = item.get("status").and_then(Value::as_str).unwrap_or("");
+        let note = item.get("note").and_then(Value::as_str).unwrap_or("");
+        let waits = matches!(status, "accepted" | "pending");
         let failure = if let Some(error) = item.get("error").and_then(Value::as_str) {
             let issues: Vec<String> = items(item.get("issues"))
                 .iter()
@@ -1975,17 +1979,18 @@ impl Studio {
             } else {
                 format!("{error} {}", issues.join("; "))
             })
-        } else if status != "published" {
-            let note = item.get("note").and_then(Value::as_str).unwrap_or("");
-            Some(
-                format!("It waits in the library ({status}). {note}")
-                    .trim()
-                    .to_owned(),
-            )
-        } else {
+        } else if status == "published" {
             item.get("tagsError")
                 .and_then(Value::as_str)
                 .map(str::to_owned)
+        } else if waits {
+            None
+        } else {
+            Some(
+                format!("The library did not publish it ({status}). {note}")
+                    .trim()
+                    .to_owned(),
+            )
         };
         self.store.update_variant(vid, |v| {
             if status != "published" {
@@ -1993,6 +1998,9 @@ impl Studio {
             }
             if let Some(failure) = &failure {
                 v.push_log("error", failure.clone());
+            } else if waits {
+                let why = format!("It waits in the library ({status}). {note}");
+                v.push_log("publish", why.trim().to_owned());
             }
             v.publish_error = failure;
         });

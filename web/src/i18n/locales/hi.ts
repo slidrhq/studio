@@ -141,6 +141,7 @@ const words: Partial<Record<MessageKey, string>> = {
   'display.stateAwaitingPublish': 'मंज़ूरी और प्रकाशन के लिए तैयार',
   'display.stateFailsContract': 'अनुबंध पर खरा नहीं',
   'display.statePublishing': 'प्रकाशित हो रहा है',
+  'display.stateWaitsInLibrary': 'लाइब्रेरी में प्रतीक्षारत',
   'display.statePublished': 'प्रकाशित',
   'display.stateChanged': 'प्रकाशन के बाद बदला गया',
   'display.statePublishFailed': 'प्रकाशन विफल',
